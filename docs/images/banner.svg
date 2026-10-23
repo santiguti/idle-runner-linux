@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" shape-rendering="crispEdges">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1fa3e8"/>
+      <stop offset="1" stop-color="#7fd6ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" fill="url(#sky)"/>
+
+  <!-- pixel clouds -->
+  <g fill="#ffffff" opacity="0.85">
+    <rect x="80" y="60" width="120" height="24"/><rect x="104" y="40" width="64" height="20"/><rect x="60" y="84" width="170" height="16"/>
+    <rect x="980" y="50" width="140" height="24"/><rect x="1010" y="30" width="70" height="20"/><rect x="960" y="74" width="200" height="16"/>
+    <rect x="620" y="24" width="90" height="16"/><rect x="600" y="40" width="130" height="14"/>
+  </g>
+
+  <!-- hills and ground -->
+  <path d="M0 250 L160 205 L320 235 L520 195 L700 240 L900 200 L1100 230 L1280 205 L1280 320 L0 320 Z" fill="#6cc96a"/>
+  <rect y="270" width="1280" height="50" fill="#8a8f98"/>
+  <g fill="#6d727b">
+    <rect x="0" y="270" width="1280" height="6"/>
+    <rect x="40" y="288" width="60" height="4"/><rect x="200" y="300" width="80" height="4"/><rect x="420" y="288" width="60" height="4"/>
+    <rect x="640" y="300" width="80" height="4"/><rect x="860" y="288" width="60" height="4"/><rect x="1080" y="300" width="80" height="4"/>
+  </g>
+
+  <!-- pixel coins -->
+  <g>
+    <rect x="1040" y="196" width="24" height="24" fill="#f5c542"/><rect x="1046" y="202" width="12" height="12" fill="#ffe28a"/>
+    <rect x="1100" y="176" width="24" height="24" fill="#f5c542"/><rect x="1106" y="182" width="12" height="12" fill="#ffe28a"/>
+    <rect x="1160" y="196" width="24" height="24" fill="#f5c542"/><rect x="1166" y="202" width="12" height="12" fill="#ffe28a"/>
+  </g>
+
+  <!-- title -->
+  <g font-family="'DejaVu Sans Mono', Consolas, 'Courier New', monospace" font-weight="bold">
+    <text x="84" y="164" font-size="76" fill="#0b3954">Idle Runner</text>
+    <text x="80" y="160" font-size="76" fill="#ffffff">Idle Runner</text>
+    <rect x="604" y="104" width="152" height="64" fill="#0b3954"/>
+    <text x="620" y="150" font-size="40" fill="#f5c542">LINUX</text>
+    <text x="82" y="214" font-size="24" fill="#0b3954">An Idle Slayer bot that plays by looking at the screen</text>
+    <text x="82" y="246" font-size="18" fill="#0b3954">ported from Devil4ngle's AutoIt script</text>
+  </g>
+</svg>
