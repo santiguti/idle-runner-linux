@@ -1,0 +1,413 @@
+import os
+import signal
+import time
+from dataclasses import replace
+
+import numpy as np
+import pytest
+
+import idle_runner.runner as runner_module
+from idle_runner.config import Settings
+from idle_runner.game import Game
+from idle_runner.log import log
+from idle_runner.runner import (BOX_RETRY_MS, MAX_CONSECUTIVE_CRASHES, SIX_COIN_TIMEOUT_MS, WINDOW_RETRY_MS, Runner,
+                                 install_stop_signals)
+from idle_runner.x11 import GameUnavailable, WindowGone
+from tests.fakes import OFFSET, FakeBackend
+
+
+def test_silver_box_is_collected(game, fake, jumper, event_names) -> None:
+    fake.paint(650, 36, 0xCA9700)
+    Runner(game, Settings(), jumper).tick()
+
+    assert (644, 49) in fake.clicks()
+    assert "Silver Box Collected" in event_names()
+
+
+def test_unfocused_game_gets_no_input_and_pause_is_logged_once(game, fake, jumper, event_names) -> None:
+    fake.paint(650, 36, 0xCA9700)
+    fake.active = False
+    runner = Runner(game, Settings(), jumper)
+    runner.tick()
+    runner.tick()
+
+    assert fake.clicks() == []
+    assert event_names().count("Paused: game not focused") == 1
+
+
+def test_megahorde_with_soul_bonus_crafts_and_rages(game, fake, jumper, event_names) -> None:
+    fake.paint(385, 280, 0x140C1C)  # megahorde
+    fake.paint(627, 150, 0xA86D0A)  # soul bonus
+    Runner(game, replace(Settings(), craft_rage_pill=True), jumper).tick()
+
+    assert (160, 100) in fake.clicks()  # crafting menu opened
+    assert "r" in fake.taps()
+    assert jumper.pauses >= 1
+    names = event_names()
+    assert "MegaHorde Rage with SoulBonus" in names and "MegaHorde Rage" in names
+
+
+def test_no_rage_without_soul_bonus_when_disabled(game, fake, jumper) -> None:
+    fake.paint(385, 280, 0x140C1C)
+    Runner(game, replace(Settings(), disable_rage_without_soul_bonus=True), jumper).tick()
+
+    assert "r" not in fake.taps()
+
+
+def test_dimensional_staff_is_crafted_once_per_run(game, fake, jumper, event_names) -> None:
+    fake.paint(385, 280, 0x140C1C)
+    runner = Runner(game, replace(Settings(), craft_dimensional_staff=True), jumper)
+    runner.tick()
+    runner.tick()
+
+    assert event_names().count("Trying to CraftingTemp Item") == 1
+
+
+def test_auto_buy_runs_on_the_slow_tick_after_its_interval(game, fake, jumper, event_names) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True, auto_buy_minutes=0.1), jumper)
+    fake.t += 7_000
+    runner.tick()
+
+    assert "AutoUpgrade Active" in event_names()
+
+
+def test_auto_ascend_runs_on_the_slow_tick_after_its_interval(game, fake, jumper, event_names) -> None:
+    runner = Runner(game, replace(Settings(), auto_ascend=True, auto_ascend_minutes=0.1), jumper)
+    fake.t += 7_000
+    runner.tick()
+
+    assert "Ascend skipped" in event_names()  # the fake screen has no ascend button
+
+
+def test_focus_loss_mid_routine_aborts_without_more_input(game, fake, jumper, event_names) -> None:
+    fake.paint(99, 113, 0xFFFF7A)  # minions are back
+
+    def lose_focus(action: tuple) -> None:
+        if action[0] == "click":
+            fake.active = False
+
+    fake.on_action = lose_focus
+    with pytest.raises(GameUnavailable):
+        Runner(game, Settings(), jumper).tick()
+
+    assert fake.clicks() == [(95, 90)]
+    assert "routine_abort" in event_names()
+
+
+def test_run_warns_on_wrong_window_size_and_releases_keys_on_ctrl_c(jumper, event_names) -> None:
+    fake = FakeBackend(width=1600, height=900)
+    fake.stop_at = 1_000  # Ctrl+C after one virtual second
+    Runner(Game(fake, offset=OFFSET), Settings(), jumper).run()
+
+    names = event_names()
+    assert "Window size mismatch" in names and "Bot stopped" in names
+    assert ("key", "Up", False) in fake.actions and ("button", 1, False) in fake.actions
+    assert jumper.running and jumper.stopped
+
+
+def test_circle_portals_rotate_destinations(game, fake, jumper, monkeypatch) -> None:
+    taken = []
+    monkeypatch.setattr(runner_module, "portal_ready", lambda g: True)
+    monkeypatch.setattr(runner_module, "take_portal", lambda g, count: taken.append(count))
+    runner = Runner(game, replace(Settings(), circle_portals=True, circle_portals_count=9), jumper)
+    fake.t += 6_000
+    runner.tick()
+    fake.t += 6_000
+    runner.tick()
+
+    assert taken == [9, 1]
+
+
+def test_chest_hunt_is_dispatched(game, fake, jumper, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(runner_module, "chest_hunt", lambda g, *flags: calls.append(flags))
+    fake.paint(187, 296, 0xFFBB31)
+    fake.paint(187, 303, 0xF68F37)
+    Runner(game, Settings(), jumper).tick()
+
+    assert calls == [(True, False, False)]
+
+
+def test_bonus_stage_is_dispatched_on_the_slow_tick(game, fake, jumper, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(runner_module, "bonus_stage", lambda g, skip: calls.append(skip))
+    fake.paint(660, 254, 0xFFE737)
+    fake.paint(638, 236, 0xFFBB31)
+    runner = Runner(game, replace(Settings(), skip_bonus_stage=True), jumper)
+    fake.t += 6_000
+    runner.tick()
+
+    assert calls == [True]
+
+
+def test_boss_fight_picks_knight_or_victor(game, fake, jumper, monkeypatch) -> None:
+    fought = []
+    monkeypatch.setattr(runner_module, "boss_fight_victor", lambda g: fought.append("victor"))
+    monkeypatch.setattr(runner_module, "boss_fight_knight", lambda g: fought.append("knight"))
+    for x, color in ((639, 0xFF878A), (634, 0xF263BD), (644, 0xFFF38F)):
+        fake.paint(x, 224, color)
+    runner = Runner(game, Settings(), jumper)
+    fake.t += 6_000
+    runner.tick()
+    fake.paint(30, 690, 0x0B0303)  # Knight's arena
+    fake.t += 6_000
+    runner.tick()
+
+    assert fought == ["victor", "knight"]
+
+
+def test_ascending_heights_is_dispatched(game, fake, jumper, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(runner_module, "ascending_heights", lambda g: calls.append(True))
+    fake.paint(671, 213, 0xC2F4F9)
+    fake.paint(637, 300, 0xFFCC66)
+    runner = Runner(game, Settings(), jumper)
+    fake.t += 6_000
+    runner.tick()
+
+    assert calls == [True]
+
+
+def test_post_ascend_ramp_buys_soon_then_backs_off(game, fake, jumper, monkeypatch) -> None:
+    settings = replace(Settings(), auto_buy_upgrades=True, auto_buy_minutes=10,
+                       auto_ascend=True, auto_ascend_minutes=1, post_ascend_first_buy_seconds=15)
+    runner = Runner(game, settings, jumper)
+    buys = []
+    monkeypatch.setattr(runner.shop, "auto_ascend", lambda: True)
+    monkeypatch.setattr(runner.shop, "auto_upgrade", lambda: buys.append(fake.t))
+
+    fake.t += 61_000
+    runner.tick()  # ascends; the 10-minute buy timer isn't due
+    assert buys == [] and runner.buy_minutes == 0.25
+
+    fake.t += 16_000
+    runner.tick()  # 15 s after ascending: first fast buy
+    assert len(buys) == 1 and runner.buy_minutes == 0.5
+
+
+def test_post_ascend_ramp_can_be_disabled(game, fake, jumper, monkeypatch) -> None:
+    settings = replace(Settings(), auto_buy_upgrades=True, auto_ascend=True, auto_ascend_minutes=1,
+                       post_ascend_first_buy_seconds=0)
+    runner = Runner(game, settings, jumper)
+    monkeypatch.setattr(runner.shop, "auto_ascend", lambda: True)
+    fake.t += 61_000
+    runner.tick()
+
+    assert runner.buy_minutes == 10
+
+
+def test_wrong_window_size_pauses_input_and_warns(jumper, event_names, logs) -> None:
+    fake = FakeBackend(width=1600, height=900)
+    fake.paint(650, 36, 0xCA9700)
+    Runner(Game(fake, offset=OFFSET), Settings(), jumper).tick()
+    for handler in log.handlers:
+        handler.flush()
+
+    assert fake.clicks() == []
+    assert "Paused: window is 1600x900, expected 1280x720" in event_names()
+    assert "WARNING" in (logs / "idle_runner.log").read_text()
+
+
+def test_window_resized_mid_run_pauses_the_bot(game, fake, jumper, event_names) -> None:
+    runner = Runner(game, Settings(), jumper)
+    fake.frame = np.zeros((900, 1600, 3), dtype=np.uint8)  # e.g. the user maximized the window
+    fake.paint(650, 36, 0xCA9700)
+    runner.tick()
+
+    assert fake.clicks() == []
+    assert "Paused: window is 1600x900, expected 1280x720" in event_names()
+
+
+def test_run_survives_an_unexpected_error_in_a_tick(game, fake, jumper, event_names, monkeypatch) -> None:
+    runner = Runner(game, Settings(), jumper)
+    real_tick = runner.tick
+    calls = []
+
+    def flaky_tick() -> None:
+        calls.append(1)
+        if len(calls) == 1:
+            raise IndexError("bad grab")
+        if len(calls) == 3:
+            raise KeyboardInterrupt
+        real_tick()
+
+    monkeypatch.setattr(runner, "tick", flaky_tick)
+    runner.run()
+
+    assert len(calls) == 3
+    assert "tick_crash" in event_names() and "Bot stopped" in event_names()
+
+
+def test_run_gives_up_after_repeated_errors_and_still_releases_keys(game, fake, jumper, event_names,
+                                                                    monkeypatch) -> None:
+    runner = Runner(game, Settings(), jumper)
+
+    def broken_tick() -> None:
+        raise IndexError("always")
+
+    monkeypatch.setattr(runner, "tick", broken_tick)
+    with pytest.raises(IndexError):
+        runner.run()
+
+    assert event_names().count("tick_crash") == MAX_CONSECUTIVE_CRASHES
+    assert ("key", "Up", False) in fake.actions
+
+
+def test_run_releases_keys_even_if_stopping_the_jumper_is_interrupted(game, fake, jumper) -> None:
+    def interrupted_stop() -> None:
+        raise KeyboardInterrupt  # a second Ctrl+C during shutdown
+
+    jumper.stop = interrupted_stop
+    fake.stop_at = 100
+    with pytest.raises(KeyboardInterrupt):
+        Runner(game, Settings(), jumper).run()
+
+    assert ("key", "Up", False) in fake.actions
+
+
+def test_stop_signals_raise_keyboard_interrupt() -> None:
+    previous = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGHUP)}
+    try:
+        install_stop_signals()
+        with pytest.raises(KeyboardInterrupt):
+            os.kill(os.getpid(), signal.SIGTERM)
+            time.sleep(1)  # the handler runs between bytecodes
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+
+
+def test_game_unavailable_is_logged_once_and_resumed_when_it_clears(game, fake, jumper, event_names) -> None:
+    real_grab = fake.grab
+
+    def grab_fails_for_3_seconds(x: int, y: int, w: int, h: int) -> np.ndarray:
+        if fake.t < 3_000:
+            raise GameUnavailable("cannot capture the game window (BadMatch)")
+        return real_grab(x, y, w, h)
+
+    fake.grab = grab_fails_for_3_seconds
+    fake.stop_at = 5_000
+    Runner(game, Settings(), jumper).run()
+
+    names = event_names()
+    assert names.count("Game unavailable") == 1
+    assert names.count("Resumed") == 1 and names.index("Resumed") > names.index("Game unavailable")
+
+
+def test_pause_after_game_unavailable_is_not_reported_as_resumed(game, fake, jumper, event_names) -> None:
+    fake.paint(99, 113, 0xFFFF7A)  # minions are back
+
+    def lose_focus(action: tuple) -> None:
+        if action[0] == "click":
+            fake.active = False
+
+    fake.on_action = lose_focus
+    fake.stop_at = 3_000
+    Runner(game, Settings(), jumper).run()
+
+    names = event_names()
+    assert names.count("Game unavailable") == 1 and "Paused: game not focused" in names
+    assert "Resumed" not in names  # the game is still unfocused
+
+
+def test_bot_started_logs_the_effective_settings(game, fake, jumper, events) -> None:
+    fake.stop_at = 100
+    Runner(game, replace(Settings(), jump_interval_ms=90), jumper).run()
+
+    started = next(r for r in events() if r["event"] == "Bot started")
+    assert started["jump_interval_ms"] == 90 and started["window_name"] == "Idle Slayer"
+
+
+def test_restarted_game_window_is_found_again(game, fake, jumper, event_names) -> None:
+    real_size = fake.size
+    lookups = []
+
+    def window_gone() -> tuple[int, int]:
+        raise WindowGone("the game window is gone (BadDrawable)")
+
+    def find_window() -> None:
+        lookups.append(fake.t)
+        if len(lookups) < 3:
+            raise GameUnavailable("no X11 window named 'Idle Slayer'; is the game running?")
+        fake.size = real_size  # the relaunched game's window
+
+    fake.size = window_gone
+    fake.find_window = find_window
+    fake.paint(650, 36, 0xCA9700)  # silver box: proves ticks run again afterwards
+    fake.stop_at = 20_000
+    Runner(game, Settings(), jumper).run()
+
+    names = event_names()
+    assert names.count("Game window lost") == 1 and names.count("Game window found") == 1
+    assert "Game unavailable" not in names
+    assert len(lookups) == 3 and lookups[1] - lookups[0] >= WINDOW_RETRY_MS
+    assert (644, 49) in fake.clicks()
+
+
+def test_claim_trigger_matches_the_pulsing_shop_button_near_its_peak(game, fake, jumper, monkeypatch) -> None:
+    runner = Runner(game, Settings(), jumper)
+    claims = []
+    monkeypatch.setattr(runner.shop, "claim_quests", lambda: claims.append(fake.t))
+    # Measured 2026-10-22 at 144 FPS: the button glows smoothly from 989898 to CFCF46 and back,
+    # so the exact CBCB4C of the original lasts one frame (~7 ms) and the 40 ms loop rarely sees it.
+    for color, expected in ((0x989898, 0), (0xBCBC63, 0), (0xC3C35A, 1), (0xCFCF46, 2)):
+        fake.paint(1130, 610, color)
+        runner.tick()
+        assert len(claims) == expected, hex(color)
+
+
+def run_ticks_reading(runner: Runner, fake: FakeBackend, monkeypatch, readings: list) -> None:
+    values = iter(readings)
+    monkeypatch.setattr(runner_module, "read_coins", lambda g: next(values))
+    for _ in readings:
+        runner.tick()
+        fake.t += 1_000
+
+
+def test_buys_as_soon_as_coins_reach_six_after_an_ascension(game, fake, jumper, event_names, monkeypatch) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True), jumper)
+    buys = []
+    monkeypatch.setattr(runner.shop, "auto_upgrade", lambda: buys.append(fake.t))
+    run_ticks_reading(runner, fake, monkeypatch, [None, 0.0, 3.0, None, 7.5, 11.3])
+
+    assert len(buys) == 1 and "Coins reached 6" in event_names()
+    assert runner.buy_minutes == 0.25  # then the post-ascension ramp, from this buy
+
+
+def test_no_six_coin_buy_without_a_low_reading_first(game, fake, jumper, monkeypatch) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True), jumper)
+    buys = []
+    monkeypatch.setattr(runner.shop, "auto_upgrade", lambda: buys.append(fake.t))
+    run_ticks_reading(runner, fake, monkeypatch, [7.5, 11.3, 15.0])
+
+    assert buys == []
+
+
+def test_six_coin_buy_falls_back_after_two_minutes_of_unreadable_counter(game, fake, jumper, event_names,
+                                                                        monkeypatch) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True, auto_buy_minutes=60), jumper)
+    buys = []
+    monkeypatch.setattr(runner.shop, "auto_upgrade", lambda: buys.append(fake.t))
+    run_ticks_reading(runner, fake, monkeypatch, [0.0] + [None] * 130)
+
+    assert event_names().count("Coins reading timed out") == 1
+    assert buys and SIX_COIN_TIMEOUT_MS <= buys[0] < SIX_COIN_TIMEOUT_MS + 5_000  # later buys: the ramp
+
+
+def test_buying_resumes_soon_after_a_box_interrupts_it(game, fake, jumper, event_names, monkeypatch) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True, auto_buy_minutes=10), jumper)
+    results = iter([False, True])
+    buys = []
+
+    def auto_upgrade() -> bool:
+        buys.append(fake.t)
+        return next(results)
+
+    monkeypatch.setattr(runner.shop, "auto_upgrade", auto_upgrade)
+    fake.t += 601_000
+    runner.tick()  # the timed buy, interrupted by a box
+    for _ in range(4):
+        fake.t += 6_000
+        runner.tick()
+
+    assert len(buys) == 2 and buys[1] - buys[0] <= BOX_RETRY_MS + 10_000

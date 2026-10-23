@@ -1,0 +1,41 @@
+# Idle Runner (Linux) settings. Copy to config.toml and edit.
+# Every key is optional: a missing key uses the default shown here.
+
+[game]
+window_name = "Idle Slayer"
+# Offset between the original AutoIt coordinates (window including the Windows title bar
+# and borders) and the game's client area. Measured with `python -m idle_runner probe`.
+offset_x = 8
+offset_y = 31
+# Extra per-channel tolerance added to every colour comparison (0 = exact, like AutoIt).
+color_tolerance = 0
+
+[general]
+jump_interval_ms = 150                   # 0-300: "Jump Rate" of the original GUI
+circle_portals = false
+circle_portals_count = 7                 # first destination: 1 hills, 2 hot desert, 3 jungle, 4 frozen fields,
+                                         # 5 funky, 6 modern city, 7 factory, 8 valley, 9 castle
+disable_rage_without_soul_bonus = false  # don't rage at Megahordes unless Soul Bonus is active
+auto_buy_upgrades = false
+auto_buy_minutes = 10
+auto_ascend = false
+auto_ascend_minutes = 10
+post_ascend_first_buy_seconds = 15       # after ascending, buy this soon, then double the wait up to
+                                         # auto_buy_minutes (0 = original behaviour)
+
+[minigames]
+skip_bonus_stage = false
+no_lockpicking = true                    # true if you DON'T have the Divinity Lockpicking 100
+no_reinforced_crystal_saver = false      # true if you DON'T have the Reinforced Crystal Saver
+perfect_chest_hunt = false               # riskier strategy that goes for Perfect Chest Hunts
+
+[crafting]
+craft_soul_bonus = false                 # Souls Compass at Megahorde + Soul Bonus
+craft_rage_pill = false                  # Rage Pill at Megahorde + Soul Bonus
+craft_dimensional_staff = false          # once per run, at the first Megahorde
+craft_bidimensional_staff = false        # once per run, at the first Megahorde
+
+[debug]
+log_dir = "logs"
+log_level = "INFO"                       # DEBUG also traces every pixel search in the log file
+save_frames = true                       # PNG screenshots at minigames, timeouts and crashes
