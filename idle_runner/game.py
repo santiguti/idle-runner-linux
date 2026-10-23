@@ -13,7 +13,7 @@ from typing import Protocol
 
 import numpy as np
 
-from idle_runner.log import event, log
+from idle_runner.log import event, inputs, log
 from idle_runner.png import write_png
 from idle_runner.x11 import GameUnavailable
 
@@ -187,6 +187,7 @@ class Game:
     def move(self, x: int, y: int) -> None:
         """MouseMove(x, y, 0)."""
         self._require_focus()
+        inputs.info("move (%d,%d)", x, y)
         point = self._client(x, y)
         if point:
             self.backend.move(*point)
@@ -194,6 +195,7 @@ class Game:
     def click(self, x: int, y: int, clicks: int = 1) -> None:
         """MouseClick("left", x, y, clicks, 0): instant move, 10 ms down/up delays (AutoIt defaults)."""
         self._require_focus()
+        inputs.info("click (%d,%d) x%d", x, y, clicks)
         point = self._client(x, y)
         if point is None:
             return
@@ -206,14 +208,17 @@ class Game:
 
     def mouse_down(self) -> None:
         self._require_focus()
+        inputs.info("mouse down")
         self.backend.button(LEFT, True)
 
     def mouse_up(self) -> None:
+        inputs.info("mouse up")
         self.backend.button(LEFT, False)  # never refused: a stuck button is worse than a stray release
 
     def wheel(self, up: bool, notches: int) -> None:
         """MouseWheel($MOUSE_WHEEL_UP/DOWN, notches) at the current pointer position."""
         self._require_focus()
+        inputs.info("wheel %s x%d", "up" if up else "down", notches)
         button = WHEEL_UP if up else WHEEL_DOWN
         for _ in range(notches):
             self.backend.button(button, True)
@@ -222,6 +227,7 @@ class Game:
     def drag(self, x1: int, y1: int, x2: int, y2: int) -> None:
         """MouseClickDrag("left", ...) at AutoIt's default speed: press, wait, glide, wait, release."""
         self._require_focus()
+        inputs.info("drag (%d,%d) -> (%d,%d)", x1, y1, x2, y2)
         start, end = self._client(x1, y1), self._client(x2, y2)
         if start is None or end is None:
             return
@@ -238,16 +244,20 @@ class Game:
 
     def key_down(self, key: str) -> None:
         self._require_focus()
+        inputs.info("key down %s", key)
         self.backend.key(key, True)
 
     def key_up(self, key: str) -> None:
+        inputs.info("key up %s", key)
         self.backend.key(key, False)  # never refused, like mouse_up
 
     def tap(self, key: str) -> None:
         """Send("{key}") / ControlSend with AutoIt's default 5 ms key delays."""
-        self.key_down(key)
+        self._require_focus()
+        inputs.debug("tap %s", key)  # mostly the jumper: too frequent for INFO
+        self.backend.key(key, True)
         self.sleep(5)
-        self.key_up(key)
+        self.backend.key(key, False)
         self.sleep(5)
 
     def hold(self, press_ms: float, post_ms: float = 0, key: str = "Up") -> None:
@@ -257,14 +267,16 @@ class Game:
         holds `d` for 15 s) is released at once if the user switches windows, instead of
         auto-repeating into the newly focused window.
         """
-        self.key_down(key)
+        self._require_focus()
+        inputs.info("hold %s %d ms, then %d ms", key, press_ms, post_ms)
+        self.backend.key(key, True)
         try:
             deadline = self.now() + press_ms
             while (remaining := deadline - self.now()) > 0:
                 self.sleep(min(50, remaining))
                 self._require_focus()
         finally:
-            self.key_up(key)
+            self.backend.key(key, False)
         self.sleep(post_ms)
 
     def release_all(self) -> None:

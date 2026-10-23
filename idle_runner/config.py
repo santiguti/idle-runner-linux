@@ -1,4 +1,5 @@
 """Settings, read from a TOML file (see config.example.toml)."""
+import json
 import tomllib
 from dataclasses import dataclass, fields
 from pathlib import Path
@@ -21,6 +22,7 @@ class Settings:
     auto_ascend: bool = False
     auto_ascend_minutes: float = 10
     post_ascend_first_buy_seconds: int = 15
+    ascend_bonus_sample_minutes: float = 0
     # [minigames]
     skip_bonus_stage: bool = False
     no_lockpicking: bool = True
@@ -35,6 +37,8 @@ class Settings:
     log_dir: str = "logs"
     log_level: str = "INFO"
     save_frames: bool = True
+    blackbox_fps: float = 4
+    blackbox_minutes: float = 60
 
 
 # Which [section] each setting goes in, in the order of config.example.toml.
@@ -42,10 +46,10 @@ SECTIONS: dict[str, tuple[str, ...]] = {
     "game": ("window_name", "offset_x", "offset_y", "color_tolerance"),
     "general": ("jump_interval_ms", "circle_portals", "circle_portals_count", "disable_rage_without_soul_bonus",
                 "auto_buy_upgrades", "auto_buy_minutes", "auto_ascend", "auto_ascend_minutes",
-                "post_ascend_first_buy_seconds"),
+                "post_ascend_first_buy_seconds", "ascend_bonus_sample_minutes"),
     "minigames": ("skip_bonus_stage", "no_lockpicking", "no_reinforced_crystal_saver", "perfect_chest_hunt"),
     "crafting": ("craft_soul_bonus", "craft_rage_pill", "craft_dimensional_staff", "craft_bidimensional_staff"),
-    "debug": ("log_dir", "log_level", "save_frames"),
+    "debug": ("log_dir", "log_level", "save_frames", "blackbox_fps", "blackbox_minutes"),
 }
 
 
@@ -78,11 +82,11 @@ def load_settings(path: Path) -> Settings:
             raise ValueError(f"{path}: '{key}' must be {expected.__name__}, got {value!r}")
 
     settings = Settings(**values)
-    _check_ranges(path, settings)
+    check_ranges(path, settings)
     return settings
 
 
-def _check_ranges(path: Path, s: Settings) -> None:
+def check_ranges(path: Path, s: Settings) -> None:
     problems = []
     if not 0 <= s.jump_interval_ms <= 300:
         problems.append("jump_interval_ms must be 0-300")
@@ -90,11 +94,29 @@ def _check_ranges(path: Path, s: Settings) -> None:
         problems.append("circle_portals_count must be 1-9")
     if s.auto_buy_minutes <= 0 or s.auto_ascend_minutes <= 0:
         problems.append("auto_buy_minutes and auto_ascend_minutes must be > 0")
+    if s.ascend_bonus_sample_minutes < 0:
+        problems.append("ascend_bonus_sample_minutes must be >= 0")
     if s.post_ascend_first_buy_seconds < 0:
         problems.append("post_ascend_first_buy_seconds must be >= 0")
     if not 0 <= s.color_tolerance <= 255:
         problems.append("color_tolerance must be 0-255")
     if s.log_level not in ("DEBUG", "INFO", "WARNING"):
         problems.append("log_level must be DEBUG, INFO or WARNING")
+    if not 0 <= s.blackbox_fps <= 30:
+        problems.append("blackbox_fps must be 0-30")
+    if s.blackbox_minutes <= 0:
+        problems.append("blackbox_minutes must be > 0")
     if problems:
         raise ValueError(f"{path}: " + "; ".join(problems))
+
+
+def dump_settings(s: Settings) -> str:
+    """`s` as TOML, one [section] per group (what the Idle Runner window saves)."""
+    lines = ["# Saved by the Idle Runner window; config.example.toml explains every setting."]
+    for section, keys in SECTIONS.items():
+        lines += ["", f"[{section}]"]
+        for key in keys:
+            value = getattr(s, key)
+            # json.dumps writes valid TOML for these: true/false, numbers and basic strings.
+            lines.append(f"{key} = {json.dumps(value)}")
+    return "\n".join(lines) + "\n"

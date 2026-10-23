@@ -79,6 +79,17 @@ def test_auto_ascend_runs_on_the_slow_tick_after_its_interval(game, fake, jumper
     assert "Ascend skipped" in event_names()  # the fake screen has no ascend button
 
 
+def test_ascend_bonus_is_sampled_on_the_slow_tick_after_its_interval(game, fake, jumper, event_names) -> None:
+    runner = Runner(game, replace(Settings(), ascend_bonus_sample_minutes=0.1), jumper)
+    runner.tick()
+    assert "Ascend bonus not shown" not in event_names()  # not due yet
+
+    fake.t += 7_000
+    runner.tick()
+
+    assert "Ascend bonus not shown" in event_names()  # the fake screen has no ascension panel
+
+
 def test_focus_loss_mid_routine_aborts_without_more_input(game, fake, jumper, event_names) -> None:
     fake.paint(99, 113, 0xFFFF7A)  # minions are back
 

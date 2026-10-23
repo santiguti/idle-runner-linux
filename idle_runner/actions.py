@@ -14,8 +14,11 @@ MIN_BOX_PIXELS = 100  # measured 2026-10-23: the box shows 117-508 of them, othe
 
 
 def close_all(game: Game) -> None:
-    """Close a popup (red X button) if one is showing."""
-    game.sleep(2000)  # known issue kept from the original: blinds the fast checks for 2 s
+    """Close a popup (red X button) if one is showing.
+
+    The original slept 2 s first (Idle Runner.au3:262), which left the fast checks blind 2 s out of
+    every 5 for no reason; removed 2026-10-22.
+    """
     if game.pixel_is(680, 593, 0xAF0000):
         game.click(780, 600)
 

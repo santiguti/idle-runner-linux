@@ -1,6 +1,9 @@
+import logging
+
 import pytest
 
 from idle_runner.game import Game
+from idle_runner.log import inputs, log
 from idle_runner.x11 import GameUnavailable
 from tests.fakes import OFFSET
 
@@ -124,3 +127,28 @@ def test_find_until_with_a_label_logs_the_timeout_and_a_frame(game, events) -> N
     records = events()
     assert any(r["event"] == "Sync timeout" and r["where"] == "BonusStage3-s1-1" for r in records)
     assert any(r["event"] == "frame" and r["label"] == "sync-BonusStage3-s1-1" for r in records)
+
+
+def test_inputs_are_logged_to_the_file(game, logs) -> None:
+    game.click(1180, 170)
+    game.move(1254, 172)
+    game.wheel(up=False, notches=2)
+    game.hold(94, 1640)
+    game.tap("Up")  # the jumper taps ~13 times a second: DEBUG only
+    for handler in log.handlers:
+        handler.flush()
+
+    text = (logs / "idle_runner.log").read_text()
+    assert "INFO    [MainThread] click (1180,170) x1" in text
+    assert "INFO    [MainThread] move (1254,172)" in text
+    assert "INFO    [MainThread] wheel down x2" in text
+    assert "INFO    [MainThread] hold Up 94 ms, then 1640 ms" in text
+    assert "DEBUG   [MainThread] tap Up" in text
+
+
+def test_inputs_stay_off_the_console(logs) -> None:
+    console = next(h for h in log.handlers if not isinstance(h, logging.FileHandler))
+    record = inputs.makeRecord(inputs.name, logging.INFO, __file__, 0, "click (1,2) x1", (), None)
+
+    assert not console.filter(record)
+    assert console.filter(log.makeRecord(log.name, logging.INFO, __file__, 0, "Bot started", (), None))

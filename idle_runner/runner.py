@@ -42,6 +42,7 @@ class Runner:
         self.last_slow = now
         self.timer_buy = now
         self.timer_ascend = now
+        self.timer_bonus_sample = now
         self.buy_minutes: float = settings.auto_buy_minutes  # $iAutoBuyTempTimer
         self.portal_count = settings.circle_portals_count
         # The original unticks these after one use; with a read-only config they apply once per run.
@@ -171,6 +172,10 @@ class Runner:
                 self.buy()
             elif self.retry_buy_at is not None and g.now() >= self.retry_buy_at:
                 self.buy()
+            if (s.ascend_bonus_sample_minutes
+                    and g.now() - self.timer_bonus_sample > s.ascend_bonus_sample_minutes * 60_000):
+                self.timer_bonus_sample = g.now()
+                self._routine("ascend_bonus_sample", self.shop.sample_ascend_bonus)
             if s.auto_ascend and g.now() - self.timer_ascend > s.auto_ascend_minutes * 60_000:
                 self.timer_ascend = g.now()
                 self.shop.loop_amount = 0  # the original left this at its last value

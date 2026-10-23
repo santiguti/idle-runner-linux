@@ -1,13 +1,15 @@
 """Command line entry point: python -m idle_runner <command>."""
 import argparse
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 
+from idle_runner.blackbox import BlackBox, mark
 from idle_runner.png import write_png
-from idle_runner.config import load_settings
+from idle_runner.config import Settings, load_settings
 from idle_runner.game import Game
 from idle_runner.log import setup_logging
 from idle_runner.repeater import Repeater
@@ -68,15 +70,22 @@ def run_probe(args: argparse.Namespace) -> int:
     return 0
 
 
-def run_bot(config_path: Path) -> int:
+def read_settings(config_path: Path) -> Settings | None:
+    """Load the config, or print why it can't be used and return None."""
     if not config_path.exists():
         print(f"error: {config_path} not found; copy config.example.toml to {config_path} and edit it",
               file=sys.stderr)
-        return 1
+        return None
     try:
-        settings = load_settings(config_path)
+        return load_settings(config_path)
     except ValueError as exc:  # also covers tomllib.TOMLDecodeError
         print(f"error: {exc}", file=sys.stderr)
+        return None
+
+
+def run_bot(config_path: Path) -> int:
+    settings = read_settings(config_path)
+    if settings is None:
         return 1
     log_dir = Path(settings.log_dir)
     setup_logging(log_dir, settings.log_level)
@@ -85,7 +94,30 @@ def run_bot(config_path: Path) -> int:
                 log_dir / "frames" if settings.save_frames else None)
     jumper = Repeater(game, ("Up", "Right"), settings.jump_interval_ms, "jumper")
     install_stop_signals()
-    Runner(game, settings, jumper).run()
+    recorder = None
+    if settings.blackbox_fps:
+        recorder = subprocess.Popen([sys.executable, "-m", "idle_runner", "blackbox", "--config", str(config_path)])
+    try:
+        Runner(game, settings, jumper).run()
+    finally:
+        if recorder:
+            recorder.terminate()
+    return 0
+
+
+def run_blackbox(config_path: Path) -> int:
+    settings = read_settings(config_path)
+    if settings is None:
+        return 1
+    if not settings.blackbox_fps:
+        print("error: the black box is off (blackbox_fps = 0)", file=sys.stderr)
+        return 1
+    install_stop_signals()
+    box = BlackBox(X11Backend(settings.window_name), Path(settings.log_dir), settings.blackbox_minutes)
+    try:
+        box.run(settings.blackbox_fps)
+    except KeyboardInterrupt:  # Ctrl+C reaches the bot and its black box alike
+        pass
     return 0
 
 
@@ -109,6 +141,17 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run the bot (Ctrl+C to stop)")
     run.add_argument("--config", type=Path, default=Path("config.toml"))
 
+    gui = sub.add_parser("gui", help="open the Idle Runner window")
+    gui.add_argument("--config", type=Path, default=Path("config.toml"))
+
+    blackbox = sub.add_parser("blackbox", help="only record the game (`run` starts this by itself)")
+    blackbox.add_argument("--config", type=Path, default=Path("config.toml"))
+
+    mark_cmd = sub.add_parser("mark", help="note a problem; keeps the black box's last minutes in logs/marks/")
+    mark_cmd.add_argument("text", help="what you saw")
+    mark_cmd.add_argument("--minutes", type=float, default=5, help="how much of the recording to keep")
+    mark_cmd.add_argument("--log-dir", type=Path, default=Path("logs"))
+
     args = parser.parse_args(argv)
     try:
         if args.command == "probe":
@@ -118,6 +161,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "run":
             return run_bot(args.config)
+        if args.command == "gui":
+            from idle_runner.gui import main as gui_main  # tkinter only loads for the window
+            return gui_main(args.config)
+        if args.command == "blackbox":
+            return run_blackbox(args.config)
+        if args.command == "mark":
+            setup_logging(args.log_dir)
+            print(f"saved to {mark(args.log_dir, args.text, args.minutes)}")
+            return 0
     except GameUnavailable as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

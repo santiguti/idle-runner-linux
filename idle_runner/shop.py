@@ -17,7 +17,19 @@ BUY_ALL_BAR = 0xA5A5A5             # A1A1A1-A8A8A8 at (1180, 636)
 # Not in the original (measured 2026-10-22): event quests (new on 2026-10-21) put their rewards at the
 # top of the Upgrades list as blue "Quest Reward" rows that can't be bought.
 QUEST_REWARD_BLUE = 0x0B6BA1  # their background, at x = 1130
+# Their button at x = 1180: grey "Quest Reward" until the event quest's reward is claimed, then a normal
+# "Unlock" button (green 11A622 when affordable): the row stays blue but can be bought (2026-10-23).
+QUEST_REWARD_GREY = 0x7A7A7A
 WHEEL_PX = 50  # one wheel notch scrolls a shop list by 50 px
+# The ascension panel since the Ultra Ascension node was bought (measured 2026-10-23, client x): Ascend
+# 92-307, Ultra Ascend 332-549. The original's confirm click (550, 580) is client (542, 549), inside Ultra
+# Ascend whenever the "Are you sure?" dialog isn't up yet or the Ascend click got lost. (598, 581) is
+# client (590, 550): "Yes" (493-624) in that dialog, "Close" in "You can't Ascend" (nothing to claim),
+# and empty panel (441C06) without a dialog. It is never Ultra Ascend.
+ASCEND_CONFIRM = (598, 581)
+ASCEND_YES = 0x00A400
+CANT_ASCEND_CLOSE = 0xAF0000
+ASCEND_ICON = 0xA328B3  # magenta of the dialogs' Ascension icon; Ultra Ascend is cyan and dark blue
 FIRST_SEPARATOR_Y = 153  # line above the first Upgrades row when the list is at its top
 
 
@@ -40,18 +52,27 @@ def scroll_to_top(game: Game, x: int, y: int, where: str, pause_ms: float = 0) -
 
 
 def first_row_after_quest_rewards(game: Game) -> int:
-    """Scroll the Upgrades list past its blue "Quest Reward" rows; return the y of the next row.
+    """Scroll the Upgrades list past its "Quest Reward" rows (blue, grey button); return the y of the next row.
 
     BuyUpgrade only ever buys the top row (y = 170), so those rows stopped it at once. Rows are 96 px
     apart and a notch scrolls 50 px, so this scrolls until the next row's separator is within one
-    notch of the list top, then returns the same y the original uses for the top row.
+    notch of the list top, then returns the same y the original uses for the top row. Blue rows with a
+    buy button are claimed rewards and are bought like any other row.
     """
     def lowest(color: int, x: int) -> Point | None:
         return game.pixel_search(x, 609, x, FIRST_SEPARATOR_Y, color)  # bottom-up
 
-    blue = lowest(QUEST_REWARD_BLUE, 1130)
+    def rewards_end() -> int | None:
+        """The separator under the lowest Quest Reward row (610 if it runs past the list), or None."""
+        grey = lowest(QUEST_REWARD_GREY, 1180)
+        if grey is None or not game.pixel_is(1130, grey[1], QUEST_REWARD_BLUE):
+            return None
+        below = game.pixel_search(1180, grey[1], 1180, 609, 0x000000)  # the button's text outline is 140C1C
+        return below[1] if below else 610
+
+    end = rewards_end()
     notches = 0
-    while blue and blue[1] + 1 > FIRST_SEPARATOR_Y + WHEEL_PX:
+    while end and end > FIRST_SEPARATOR_Y + WHEEL_PX:
         # The lowest row separator always moves when the list does (a notch isn't a multiple of 96 px).
         separator = lowest(0x000000, 1180)
         game.wheel(up=False, notches=1)
@@ -61,11 +82,11 @@ def first_row_after_quest_rewards(game: Game) -> int:
         if lowest(0x000000, 1180) == separator:
             break  # the list can't scroll any further
         notches += 1
-        blue = lowest(QUEST_REWARD_BLUE, 1130)
-    if blue is None:
+        end = rewards_end()
+    if end is None:
         return 170  # no Quest Reward rows: the original's top row
     event("Quest Reward rows skipped", notches=notches)
-    return blue[1] + 1 + (170 - FIRST_SEPARATOR_Y)
+    return end + (170 - FIRST_SEPARATOR_Y)
 
 
 class Shop:
@@ -304,29 +325,78 @@ class Shop:
         g.save_frame("claim-quests-end")
         g.click(1244, 712)  # close the shop
 
+    def sample_ascend_bonus(self) -> bool:
+        """Open the Ascension tab, save a frame of it and close the panel. Not in the original.
+
+        The Ascend button reads "+X% CpS bonus.", which is SP gained by ascending / SP earned so far, the
+        wiki's measure of when to ascend. These frames are the samples for reading it (step 3 in
+        docs/next-steps.md). Its text is pure white; the button's stars never are (measured 2026-10-23).
+        """
+        g = self.game
+        g.click(95, 90)  # ascension button
+        g.sleep(400)
+        g.click(93, 680)  # ascension tab
+        g.sleep(400)
+        shown = g.find_until(260, 480, 260, 480, 0x58188D, timeout_ms=2000) is not None  # Ascend button
+        if shown:
+            g.save_frame("ascend-bonus")
+        else:
+            event("Ascend bonus not shown")
+            g.save_frame("ascend-bonus-not-shown")
+        g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
+        return shown
+
     def auto_ascend(self) -> bool:
-        """Ascend and run one AutoUpgrade. Returns False when the ascend button wasn't found."""
+        """Ascend and run one AutoUpgrade. Returns False when it didn't ascend."""
         g = self.game
         if g.pixel_is(260, 600, 0x58188D):  # the ascension panel is already open
-            self._ascend("panel_open")
-            return True
+            return self._ascend("panel_open")
         g.click(95, 90)  # ascension button
         g.sleep(400)
         g.click(93, 680)  # ascension tab
         g.sleep(400)
         # Known issue kept from the original: it checks y = 480 but clicks y = 600.
         if g.pixel_is(260, 480, 0x58188D):
-            self._ascend("opened_panel")
-            return True
+            return self._ascend("opened_panel")
         event("Ascend skipped", reason="ascend button not found")
         g.save_frame("ascend-not-found")
         return False
 
-    def _ascend(self, path: str) -> None:
+    def ascend_dialog(self) -> int | None:
+        """Wait up to 2 s for the dialog the Ascend button opens. Returns the colour under ASCEND_CONFIRM:
+        ASCEND_YES ("Are you sure?") or CANT_ASCEND_CLOSE ("You can't Ascend"), or None."""
+        g = self.game
+        deadline = g.now() + 2000
+        while True:
+            if g.pixel_search(608, 231, 688, 301, ASCEND_ICON):
+                for color in (ASCEND_YES, CANT_ASCEND_CLOSE):
+                    if g.pixel_is(*ASCEND_CONFIRM, color):
+                        return color
+            if g.now() > deadline:
+                return None
+            g.sleep(10)
+
+    def _ascend(self, path: str) -> bool:
+        """Click Ascend and confirm; never on the Ultra Ascend button (see ASCEND_CONFIRM)."""
         g = self.game
         g.click(260, 600)  # ascend
-        g.sleep(300)
-        g.click(550, 580)  # confirm
+        dialog = self.ascend_dialog()  # the original slept 300 ms and clicked (550, 580) regardless
+        if dialog is None:
+            event("Ascend skipped", reason="no dialog after the Ascend click")
+            g.save_frame("ascend-no-dialog")
+            g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
+            return False
+        g.click(*ASCEND_CONFIRM)  # "Yes", or "Close" when there's nothing to claim
+        if dialog == CANT_ASCEND_CLOSE:
+            event("Ascend skipped", reason="nothing to claim")
+            return False
+        deadline = g.now() + 2000  # the game answers in 110-210 ms, longer in a stall
+        while g.pixel_is(*ASCEND_CONFIRM, ASCEND_YES) and g.now() <= deadline:
+            g.sleep(10)
+        if g.pixel_is(*ASCEND_CONFIRM, ASCEND_YES):  # the click got lost; repeating it is safe here
+            event("Shop click retried", target="ascend confirm")
+            g.click(*ASCEND_CONFIRM)
         g.sleep(300)
         event("Ascended", path=path)
         self.auto_upgrade()
+        return True

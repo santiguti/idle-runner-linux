@@ -26,6 +26,7 @@ Python port of Devil4ngle's AutoIt bot for the Steam game Idle Slayer. It reads 
 - Game log: `~/.config/unity3d/Pablo Leban/Idle Slayer/Player.log`; saves next to it (`savedata.sav`, cloud-synced via Firebase). Backup of 2026-10-21: `~/Documents/idle-slayer-save-backup-20261021`.
 
 ## Layout
+- `blackbox.py` — the black box (own process, `logs/blackbox/`, keeps frames around anomalies and user marks in `logs/marks/`). `gui.py` — tkinter window that runs `run` as a child process (KDE menu entry: `~/.local/share/applications/idle-runner.desktop`).
 - `idle_runner/x11.py` — only X11 code (window lookup, XGetImage, XTEST). `game.py` — AutoIt-compatible facade (`pixel_search` is column-major like AutoIt, focus guard, `routine()`, `stuck()`, frames). `runner.py` — the AutoIt `Main()` loop. `shop.py`, `actions.py`, `portals.py`, `minigames/*` — ports of the AutoIt functions. `repeater.py` — jump/boost thread.
-- Logs: `logs/idle_runner.log` (ms timestamps), `logs/events.jsonl`, `logs/frames/*.png`; `python -m idle_runner stats`.
+- Logs: `logs/idle_runner.log` (ms timestamps, plus every click/wheel/hold), `logs/events.jsonl`, `logs/frames/*.png`, `logs/blackbox/` (last hour at 4 fps), `logs/marks/` (kept frames + note); `python -m idle_runner stats`. To debug a user's unattended run, start from `logs/marks/` and the events around each mark's time.
 - Tests use `tests/fakes.py` (`FakeBackend` with a virtual clock; `paint()` takes AutoIt coordinates).

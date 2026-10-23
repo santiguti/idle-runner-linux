@@ -1,6 +1,65 @@
 # Next steps (handoff of 2026-10-22)
 
-126 tests pass (`.venv/bin/python -m pytest -q`). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
+167 tests pass (`.venv/bin/python -m pytest -q`). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
+
+## 0. Plan agreed with the user on 2026-10-22 (evening), in this order
+
+The user now runs the bot alone (KDE menu → Idle Runner, or `python -m idle_runner run`). The inherited
+architecture was reviewed: the layers (x11 → game → runner, the fake backend) are sound. What hurts is the
+original's "click, fixed sleep, assume it worked" style and single-pixel detection: about 10 of the 18 bugs
+listed below came from it, 5 from game changes and 3 from Linux. Decision: no rewrite. Fix it routine by
+routine with verified waits.
+
+1. **Unattended debugging. DONE 2026-10-22:**
+   - The 2 s sleep in `close_all` is removed (it blinded the fast checks 40% of the time).
+   - Every click, wheel notch and hold goes to `idle_runner.log`.
+   - Black box (`idle_runner/blackbox.py`, own process, 4 fps, last 60 min). Measured: 22–27 ms and
+     about 100 KB per frame.
+   - Automatic marks around anomalies; `mark` command.
+
+   To debug a user's run, start from `logs/marks/`.
+2. **GUI. DONE 2026-10-22:** `idle_runner/gui.py` (tkinter, English labels as the user asked) and the KDE
+   menu entry. Start/Stop was checked with a missing window (bot exits, error shown); the user hasn't run it
+   live yet.
+3. **Ascend by CpS bonus %** (user's idea, matches the wiki's rule). The Ascend button reads
+   "+10.6% CpS bonus.", which is gained SP / earned SP. The wiki ascends at about 20% mid game and about 10%
+   late game; the user suggested 5%. Plan:
+   - read the % every few minutes and log it as an event (the curve tells which threshold maximizes SP/hour);
+   - setting: ascend after N minutes OR at X%, whichever comes first.
+
+   Progress 2026-10-23:
+   - A manual recording of the user's panel and one manual ascension are kept in
+     `logs/marks/20261023-000700-ascension-panel/`. It only showed "+0%" (right after an ascension).
+   - The text is pure white FFFFFF and the button's twinkling stars never are, so it can be read the
+     same way as `coins.py`.
+   - `Shop.sample_ascend_bonus` (setting `ascend_bonus_sample_minutes`; 5 in the user's config) opens the
+     Ascension tab, saves a frame labelled `ascend-bonus` to `logs/frames/` and closes the panel.
+
+   Next: once those frames cover the digits 0-9 and the decimal point, build the glyph templates, read
+   the % (log it as an event every sample) and add the threshold setting.
+4. **Verified clicks:** one `Game` helper that clicks, waits for the screen to change and retries,
+   generalizing `open_shop`/`select_tab`. Move the routines that are still blind to it when they are next
+   touched: `collect_minions` (6 blind clicks, one at (691, 680) unexplained), `auto_ascend` (checks y=480,
+   clicks y=600), `buy_temp_item`, the claim loop (item 4 below).
+5. The list below. The wiki says the bonus stage "is largely unhelpful" mid game, so BS2 calibration moves
+   down. Rage: 147 rages at megahordes, 0 with Soul Bonus; once step 3 measures SP/hour, compare
+   `disable_rage_without_soul_bonus = true`.
+
+**Ultra Ascension (user, 2026-10-22):**
+- The UA node is bought; the game says 5 USP.
+- The user has Wind Waker, Ultra Instinct, Magic Bag and Temporary Hammer. The tree isn't complete.
+- The wiki recommends the first UA at 6 USP (about 6.4M total SP).
+- The bot must never ultra-ascend.
+- **FIXED 2026-10-23: `auto_ascend` could Ultra Ascend.**
+  - Since the node purchase, the panel shows Ascend (client x 92-307) and **Ultra Ascend (client x
+    332-549)** side by side.
+  - The original's confirm click (550, 580) is client (542, 549), inside Ultra Ascend whenever the
+    "Are you sure?" dialog isn't up yet or the Ascend click got lost.
+  - The confirm click is now (598, 581): Yes / Close in the dialogs, empty panel otherwise.
+  - It is only sent once a dialog with the magenta Ascension icon shows.
+  - Tests include the three recorded states (`tests/fixtures/ascend/`).
+  - Not yet run live by the bot.
+- The HUD's top-right bar now shows the USP in blue (it was the purple SP bar).
 
 ## How to resume
 
@@ -51,7 +110,15 @@
    - Over Wayland windows it is 0 (as far as seen).
 
    Still unknown: whether `child` is updated right after an XTEST move. If not, the guard would block legitimate clicks. Measuring it needs input, so ask first; then implement "don't click unless `child` is the game".
-6. **Quest Reward rows after their event quest is done.** With "Hide locked quest rewards" on, locked rewards are hidden. An unlocked, unclaimed one shows blue with a grey "Quest Reward" button (Chocolate Bar, 03:39). `first_row_after_quest_rewards` skips blue rows. Confirm that a claimed reward never needs buying. If it does, buy blue rows whose button is green.
+6. **Quest Reward rows: DONE 2026-10-23.**
+   - The user marked it (`logs/marks/20261023-013214/`): a claimed event reward ("Dracula's Tooth") stays
+     blue but gets a green "Unlock 200 Sx" button, and the bot never bought it.
+   - `first_row_after_quest_rewards` now skips only blue rows with the grey (7A7A7A) "Quest Reward"
+     button. Blue rows with a buy button are bought like any other row.
+   - Tests use both recorded frames (`tests/fixtures/quest_rewards/`).
+   - Unknown: whether claimed rewards are sorted by price or pinned at the top. If pinned, an
+     unaffordable (red) one would stop the buy loop above affordable rows. Watch for
+     "AutoUpgrade Done upgrades=0" while green rows show below a blue one.
 7. **F.** At start-up, check the in-game settings the original requires and warn, or set them. The list is in the original's README and `Libraries/Log.au3:180-212`. Later.
 8. **H, efficiency** (after the script works):
    - Use the timings from the game's wiki, https://idleslayer.fandom.com/wiki/Idle_Slayer_Wiki, for buying and ascending.
@@ -95,3 +162,16 @@
 | Bonus Stage 2 start | "Swipe to Start" slider 007E00 at (443, 620); then "Golden Invasion appeared!" and about 10 s before "Go!" |
 | Second Wind | green 00A400 at (615, 590), click (560, 600); Close red AF0000 at (716, 600) |
 | Desktop | KDE asks for remote-control permission on the first XTEST input after XWayland starts; the game stops drawing while fully covered; a destroyed window gives BadDrawable/BadWindow; a relaunched game reused window id 0x3a00008 |
+
+## 4. Notes from 2026-10-23
+
+- **Chest hunt strategy "did nothing":** `no_reinforced_crystal_saver = true` (set by the user in the
+  window at 00:45) makes the original open the life saver right after the 1st chest, ahead of
+  `perfect_chest_hunt`. This is the original's GetUpdatedState, not a port bug. The wiki: Crystal Saver
+  = 1st chest safe, Reinforced = 2nd chest safe too. The hints in `config.example.toml` now say so. The
+  user wants the aggressive strategy, so their config has it false.
+- **The window overwrote an outside edit of `config.toml`** (the `ascend_bonus_sample_minutes = 5` set by
+  Claude was lost). The window now asks before overwriting a file changed since it opened. Don't edit
+  `config.toml` while the window is open; ask the user to change it there.
+- Three hunts in a row (00:39, 00:50, 00:59) gave the identical sequence R R R R R M R, ending at chest 7.
+  Unexplained; check the black-box frames if it repeats.

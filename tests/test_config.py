@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from idle_runner.config import SECTIONS, Settings, load_settings
+from idle_runner.config import SECTIONS, Settings, dump_settings, load_settings
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "config.example.toml"
 
@@ -67,3 +67,20 @@ def test_key_repeated_across_sections_is_an_error(tmp_path) -> None:
 def test_every_setting_belongs_to_exactly_one_section() -> None:
     keys = [key for section_keys in SECTIONS.values() for key in section_keys]
     assert sorted(keys) == sorted(field.name for field in fields(Settings))
+
+
+def test_black_box_settings(tmp_path) -> None:
+    s = load_settings(write(tmp_path, "[debug]\nblackbox_fps = 10\nblackbox_minutes = 30\n"))
+    assert (s.blackbox_fps, s.blackbox_minutes) == (10, 30)
+    assert load_settings(write(tmp_path, "[debug]\nblackbox_fps = 0\n")).blackbox_fps == 0  # off
+    with pytest.raises(ValueError, match="blackbox_fps must be 0-30"):
+        load_settings(write(tmp_path, "[debug]\nblackbox_fps = 31\n"))
+    with pytest.raises(ValueError, match="blackbox_minutes must be > 0"):
+        load_settings(write(tmp_path, "[debug]\nblackbox_minutes = 0\n"))
+
+
+def test_dump_settings_round_trips(tmp_path) -> None:
+    settings = Settings(window_name='Idle "Slayer"', auto_buy_upgrades=True, auto_buy_minutes=2.5,
+                        jump_interval_ms=120, blackbox_fps=0)
+
+    assert load_settings(write(tmp_path, dump_settings(settings))) == settings

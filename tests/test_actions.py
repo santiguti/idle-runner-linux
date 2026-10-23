@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from idle_runner.actions import box_on_screen
+from idle_runner.actions import box_on_screen, close_all
 from tests.fakes import read_png
 
 FIXTURES = Path(__file__).parent / "fixtures" / "boxes"
@@ -18,3 +18,11 @@ def test_floating_silver_box_is_detected(game, fake, name: str, expected: bool) 
     fake.frame[100:480, 0:790] = read_png(FIXTURES / f"{name}.png")  # client area, as recorded
 
     assert box_on_screen(game) is expected
+
+
+def test_close_all_does_not_blind_the_main_loop(game, fake) -> None:
+    start = fake.t
+
+    close_all(game)
+
+    assert fake.t - start < 100  # the original slept 2 s here, every 5 s

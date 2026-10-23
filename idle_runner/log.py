@@ -7,6 +7,8 @@ import time
 from pathlib import Path
 
 log = logging.getLogger("idle_runner")
+# Clicks, wheel notches, key holds: in the log file (to replay what the bot did), not on the console.
+inputs = logging.getLogger("idle_runner.input")
 
 _events_path: Path | None = None
 _events_lock = threading.Lock()
@@ -25,6 +27,7 @@ def setup_logging(log_dir: Path, level: str = "INFO") -> None:
     file_handler.setLevel(level)
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
+    console.addFilter(lambda record: record.name != inputs.name)
 
     for handler in log.handlers[:]:
         log.removeHandler(handler)

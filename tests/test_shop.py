@@ -1,7 +1,9 @@
+from pathlib import Path
+
 import pytest
 
-from idle_runner.shop import QUEST_REWARD_BLUE, BoxOnScreen, Shop, scroll_to_top
-from tests.fakes import OFFSET
+from idle_runner.shop import QUEST_REWARD_BLUE, BoxOnScreen, Shop, first_row_after_quest_rewards, scroll_to_top
+from tests.fakes import OFFSET, read_png
 
 
 def client_click(x: int, y: int) -> tuple:
@@ -115,12 +117,69 @@ def test_claim_quests_clicks_green_claim_buttons(game, fake, event_names) -> Non
     assert fake.clicks()[-1] == (1244, 712)
 
 
+def ascend_dialog_on_click(fake, color: int) -> None:
+    """Clicking Ascend (260, 600) opens a dialog, as measured on 2026-10-23: "Are you sure?" with Yes
+    (00A400) under (598, 581), or "You can't Ascend" with its Close (AF0000) there. Both show the magenta
+    Ascension icon. Clicking (598, 581) closes the dialog, leaving the empty panel (441C06)."""
+    def act(action: tuple) -> None:
+        if action == client_click(260, 600):
+            fake.paint(598, 581, color)
+            fake.paint(648, 271, 0xA328B3)
+        elif action == client_click(598, 581):
+            fake.paint(598, 581, 0x441C06)
+            fake.paint(648, 271, 0)
+    fake.on_action = act
+
+
+def in_ultra_ascend(x: int, y: int) -> bool:
+    """The Ultra Ascend button (client x 332-549, y 435-597, measured 2026-10-23), in AutoIt coordinates."""
+    return 332 + 8 <= x <= 549 + 8 and 435 + 31 <= y <= 597 + 31
+
+
 def test_auto_ascend_when_the_panel_is_already_open(game, fake, event_names) -> None:
     fake.paint(260, 600, 0x58188D)
+    ascend_dialog_on_click(fake, 0x00A400)
 
     assert Shop(game).auto_ascend() is True
-    assert fake.clicks()[:4] == [(260, 600), (550, 580), (1244, 712), (1163, 655)]
+    assert fake.clicks()[:4] == [(260, 600), (598, 581), (1244, 712), (1163, 655)]
     assert "Ascended" in event_names()
+
+
+def test_auto_ascend_never_clicks_ultra_ascend_when_no_dialog_shows(game, fake, events) -> None:
+    fake.paint(260, 480, 0x58188D)  # the Ascend button is there, but its click gets lost
+
+    assert Shop(game).auto_ascend() is False
+    assert not [c for c in fake.clicks() if in_ultra_ascend(*c)]
+    assert (550, 580) not in fake.clicks()  # the original's confirm click: inside Ultra Ascend
+    assert fake.clicks()[-1] == (570, 694)  # closes the panel
+    assert [e.get("reason") for e in events() if e["event"] == "Ascend skipped"] == ["no dialog after the Ascend click"]
+
+
+def test_auto_ascend_closes_the_cant_ascend_dialog(game, fake, events) -> None:
+    fake.paint(260, 480, 0x58188D)
+    ascend_dialog_on_click(fake, 0xAF0000)
+
+    assert Shop(game).auto_ascend() is False
+    assert fake.clicks()[-1] == (598, 581)
+    assert events()[-1]["event"] == "Ascend skipped" and events()[-1]["reason"] == "nothing to claim"
+
+
+def test_auto_ascend_repeats_a_lost_confirm_click(game, fake, event_names) -> None:
+    fake.paint(260, 480, 0x58188D)
+    ascend_dialog_on_click(fake, 0x00A400)
+    dialog = fake.on_action
+    lost: list[tuple] = []
+
+    def lose_the_first_confirm(action: tuple) -> None:
+        if action == client_click(598, 581) and not lost:
+            lost.append(action)  # the game never sees it
+        elif dialog:
+            dialog(action)
+    fake.on_action = lose_the_first_confirm
+
+    assert Shop(game).auto_ascend() is True
+    assert fake.clicks().count((598, 581)) == 2
+    assert "Shop click retried" in event_names()
 
 
 def test_auto_ascend_logs_and_saves_a_frame_when_the_button_is_missing(game, fake, event_names) -> None:
@@ -138,10 +197,11 @@ def test_claim_quests_saves_frames_of_what_it_saw(game, fake, events) -> None:
     assert labels == ["claim-quests-start", "claim-quests-end"]
 
 
-def paint_upgrades(fake, quest_rewards: int, offset: int, buyable: bool = True) -> None:
+def paint_upgrades(fake, quest_rewards: int, offset: int, buyable: bool = True, reward_button: int = 0x7A7A7A) -> None:
     """The Upgrades list scrolled down `offset` px, as measured on 2026-10-22: separators every 96 px
     (the first at y = 153 when the list is at its top), `quest_rewards` blue event rows with a grey
-    "Quest Reward" button, then rows with a green buy button."""
+    "Quest Reward" button (green "Unlock" once the reward is claimed, 2026-10-23), then rows with a green
+    buy button (red when unaffordable)."""
     def band(x: int, y0: int, y1: int, w: int, color: int) -> None:
         y0, y1 = max(y0, 153), min(y1, 609)  # the visible list
         if y0 <= y1:
@@ -153,7 +213,8 @@ def paint_upgrades(fake, quest_rewards: int, offset: int, buyable: bool = True) 
         reward = i < quest_rewards
         band(800, top, top + 2, 472, 0x000000)
         band(1100, top + 3, top + 95, 50, QUEST_REWARD_BLUE if reward else 0x454545)
-        band(1160, top + 3, top + 95, 40, 0x7A7A7A if reward or not buyable else 0x11A622)
+        button = reward_button if reward else 0x11A622 if buyable else 0xA91111
+        band(1160, top + 3, top + 95, 40, button)
 
 
 def test_buy_upgrade_scrolls_past_the_event_quest_reward_rows(game, fake) -> None:
@@ -464,3 +525,54 @@ def test_row_around_rejects_a_click_point_outside_the_row_it_found(game, fake) -
 
     assert Shop(game).row_around(170) == (156, 248)
     assert Shop(game).row_around(266) is None  # the nearest separator above belongs to another row
+
+
+@pytest.mark.parametrize(("name", "expected"), [
+    ("panel", None),         # no dialog yet: the confirm point is empty panel
+    ("confirm", 0x00A400),   # "Are you sure?"
+    ("cant", 0xAF0000),      # "You can't Ascend"
+])
+def test_ascend_dialog_on_recorded_frames(game, fake, name: str, expected: int | None) -> None:
+    """Recorded on 2026-10-23 (a manual ascension with the Ultra Ascension node bought)."""
+    fake.frame[190:560, 580:700] = read_png(Path(__file__).parent / "fixtures" / "ascend" / f"{name}.png")
+
+    assert Shop(game).ascend_dialog() == expected
+
+
+def test_sample_ascend_bonus_saves_the_panel_and_closes_it(game, fake, events) -> None:
+    fake.on_action = lambda a: fake.paint(260, 480, 0x58188D) if a == client_click(93, 680) else None
+
+    assert Shop(game).sample_ascend_bonus() is True
+    assert fake.clicks() == [(95, 90), (93, 680), (570, 694)]
+    assert [e["label"] for e in events() if e["event"] == "frame"] == ["ascend-bonus"]
+
+
+def test_sample_ascend_bonus_reports_a_panel_that_doesnt_show(game, fake, event_names) -> None:
+    assert Shop(game).sample_ascend_bonus() is False
+    assert fake.clicks()[-1] == (570, 694)
+    assert "Ascend bonus not shown" in event_names()
+
+
+def test_buy_upgrade_buys_a_claimed_quest_reward_row(game, fake, event_names) -> None:
+    """A claimed event-quest reward stays blue but gets a green "Unlock" button (Dracula's Tooth,
+    2026-10-23): it is bought like any upgrade."""
+    show_tab(fake, "upgrades")
+    paint_upgrades(fake, 1, 0, reward_button=0x11A622)
+    fake.on_action = lambda a: paint_upgrades(fake, 0, 0, buyable=False) if a == client_click(1180, 170) else None
+    shop = Shop(game)
+    shop.loop_amount = 6
+    shop.buy_upgrade()
+
+    assert fake.clicks().count((1180, 170)) == 1
+    assert ("button", 5, True) not in fake.actions  # no scrolling past it
+    assert "Quest Reward rows skipped" not in event_names()
+
+
+@pytest.mark.parametrize(("name", "expected"), [
+    ("reward-unclaimed", 266),  # Chocolate Bar, grey "Quest Reward" (2026-10-22): start at the 2nd row
+    ("reward-buyable", 170),    # Dracula's Tooth, green "Unlock 200 Sx" (2026-10-23): buy it
+])
+def test_first_row_after_quest_rewards_on_recorded_frames(game, fake, name: str, expected: int) -> None:
+    fake.frame[115:585, 800:1270] = read_png(Path(__file__).parent / "fixtures" / "quest_rewards" / f"{name}.png")
+
+    assert first_row_after_quest_rewards(game) == expected  # the fake list can't scroll: it stays put

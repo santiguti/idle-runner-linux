@@ -12,22 +12,27 @@ color_tolerance = 0
 
 [general]
 jump_interval_ms = 150                   # 0-300: "Jump Rate" of the original GUI
-circle_portals = false
+circle_portals = false                   # take the next portal destination whenever the portal is ready
 circle_portals_count = 7                 # first destination: 1 hills, 2 hot desert, 3 jungle, 4 frozen fields,
                                          # 5 funky, 6 modern city, 7 factory, 8 valley, 9 castle
 disable_rage_without_soul_bonus = false  # don't rage at Megahordes unless Soul Bonus is active
-auto_buy_upgrades = false
-auto_buy_minutes = 10
-auto_ascend = false
-auto_ascend_minutes = 10
+auto_buy_upgrades = false                # buy upgrades and equipment every auto_buy_minutes
+auto_buy_minutes = 10                    # how often to buy, once auto_buy_upgrades is on
+auto_ascend = false                      # ascend every auto_ascend_minutes (irreversible)
+auto_ascend_minutes = 10                 # how often to ascend, once auto_ascend is on
 post_ascend_first_buy_seconds = 15       # after ascending, buy this soon, then double the wait up to
                                          # auto_buy_minutes (0 = original behaviour)
+ascend_bonus_sample_minutes = 0          # save the Ascend button's "+X% CpS bonus" this often, to learn
+                                         # to read it (0 = off)
 
 [minigames]
-skip_bonus_stage = false
+skip_bonus_stage = false                 # don't play bonus stages, wait for them to end
 no_lockpicking = true                    # true if you DON'T have the Divinity Lockpicking 100
-no_reinforced_crystal_saver = false      # true if you DON'T have the Reinforced Crystal Saver
-perfect_chest_hunt = false               # riskier strategy that goes for Perfect Chest Hunts
+no_reinforced_crystal_saver = false      # true only if you DON'T own the Reinforced Crystal Saver (crafting):
+                                         # the life saver is then opened after the 1st chest, even with
+                                         # perfect_chest_hunt
+perfect_chest_hunt = false               # riskier strategy that goes for Perfect Chest Hunts: ignores the
+                                         # life saver until a 2x shows (turn the 2x2x Dark Divinity off)
 
 [crafting]
 craft_soul_bonus = false                 # Souls Compass at Megahorde + Soul Bonus
@@ -36,6 +41,8 @@ craft_dimensional_staff = false          # once per run, at the first Megahorde
 craft_bidimensional_staff = false        # once per run, at the first Megahorde
 
 [debug]
-log_dir = "logs"
+log_dir = "logs"                         # logs, screenshots and the black box go here
 log_level = "INFO"                       # DEBUG also traces every pixel search in the log file
 save_frames = true                       # PNG screenshots at minigames, timeouts and crashes
+blackbox_fps = 4                         # black box: record the game this many times a second (0 = off),
+blackbox_minutes = 60                    # keeping the last this many minutes in logs/blackbox (about 1 GB)
