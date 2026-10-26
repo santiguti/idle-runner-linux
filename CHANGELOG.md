@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.1.1 (2026-10-26)
+
+A safety fix for Ascension Tree buying, which is now seen working live.
+
+### Fixed
+- **Jewel offer when Slayer Points weren't enough.**
+  - Pressing Buy on a node you can't afford doesn't just fail. The game offers to cover the difference with jewels, which are bought with real money.
+  - The bot pressed Buy on Portal Traveler (200 SP, with 95 available) and that offer showed. Nothing was spent: its jewel button works only after you tick "I understand", and the bot never clicks that box.
+  - Now the bot hovers over each node first and presses Buy only when the tooltip shows the cost in green (enough SP).
+  - With the cost in red, it stops there without opening the node. If it can't read the cost, it closes the node without buying. If a jewel offer still shows up, the bot presses only its Close.
+- **Tree buying stopped after the first node.** After a purchase the bot clicks the node again to check it was bought. That click came while the node's window was still fading out, so the game ignored it and the bot stopped. It now waits for the fade to finish.
+
+### Seen working live
+- Ascension Tree buying: 7 nodes in order in 13 seconds (Idle Earrings I and II, Blessing of Cronus, Portals, Green Ore, Pink Ore, Soul Gem). It stopped at the first one it couldn't afford.
+
+Covered by automated tests (210 of them), including one where the tooltip says there is enough SP and the game opens the jewel offer anyway.
+
 ## v1.1.0 (2026-10-26)
 
 Idle Runner for Linux is now its own project. This release teaches it to ascend at the right moment, to spend Slayer Points on the Ascension Tree, and to keep working after an Ultra Ascension.

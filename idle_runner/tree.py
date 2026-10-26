@@ -5,8 +5,15 @@ its minimum zoom every node is always at the same place, so the routine zooms al
 Clicking a node ("Buy on Click" off) opens a modal whose pixel at (468, 571) tells its state: green = Buy
 (the prerequisites are met, not necessarily the SP), red = one wide button, "Can't buy yet" (a
 prerequisite is missing) or "Close" (bought); the wider text tells them apart.
+
+**Buy without enough SP offers to pay the difference with jewels**, bought with real money (2026-10-26).
+So Buy is clicked only after the node's tooltip showed its cost in green (enough SP), and that offer is
+closed at once if it shows anyway. Its jewel button needs its "I understand" box ticked first; nothing in
+the bot clicks that box.
 """
-from idle_runner.actions import TAB_SELECTED, open_ascension_tab
+import numpy as np
+
+from idle_runner.actions import PANEL_X_RED, TAB_SELECTED, open_ascension_tab
 from idle_runner.game import Game
 from idle_runner.log import event
 
@@ -33,6 +40,14 @@ ORDER: list[tuple[str, tuple[int, int]]] = [
 MODAL_STATE = (468, 571)
 BUY_GREEN = 0x00A400
 MODAL_RED = 0xAF0000
+JEWEL_BUTTON = 0x094309  # at MODAL_STATE in the jewel offer; its box at (583, 521) is white (2026-10-26)
+# A node's tooltip (measured 2026-10-25 on 26 tooltips): a 262626 box from x + 43, centred on the pointer.
+# Its cost line ends with the SP icon (6A31CA) and the digits are 11AA23 with enough SP, AD1111 without.
+# "Unlocked" is 11AA23 too, but never on a row with the SP icon.
+TOOLTIP_BG = (0x26, 0x26, 0x26)
+SP_ICON = (0x6A, 0x31, 0xCA)
+COST_GREEN = (0x11, 0xAA, 0x23)
+COST_RED = (0xAD, 0x11, 0x11)
 
 
 class Tree:
@@ -69,6 +84,10 @@ class Tree:
     def buy_node(self, name: str, point: tuple[int, int]) -> bool:
         """Buy one node if it isn't bought yet. False when the routine must stop here."""
         g = self.game
+        affordable = self.cost_affordable(point)
+        if affordable is False:
+            event("Tree stopped", node=name, reason="not enough SP")
+            return False
         state = self.open_modal(point)
         if state == "bought":
             self.bought.add(name)
@@ -79,7 +98,14 @@ class Tree:
             if state:
                 self.close_modal(648, 582)  # "Can't buy yet"
             return False
+        if not affordable:  # the tooltip's cost wasn't read: never Buy blind
+            event("Tree stopped", node=name, reason="cost not read")
+            g.save_frame("tree-cost-not-read")
+            self.close_modal(758, 582)  # Close
+            return False
         g.click(534, 582)  # Buy
+        if self.jewel_offer_closed(name):
+            return False
         if self.wait_modal_gone() and self.open_modal(point) == "bought":  # check it took
             self.bought.add(name)
             event("Tree node bought", node=name)
@@ -91,6 +117,45 @@ class Tree:
             self.close_modal(758, 582)  # Close
         elif state:
             self.close_modal(648, 582)
+        return False
+
+    def cost_affordable(self, point: tuple[int, int]) -> bool | None:
+        """Hover the node and read its tooltip's cost: True in green, False in red, None if no cost line
+        shows within 1.5 s (no tooltip, or "Unlocked")."""
+        g = self.game
+        x, y = point
+        g.move(x, y)
+        g.sleep(200)  # the previous node's tooltip goes; this one needs ~0.5 s of hovering
+        deadline = g.now() + 1500
+        while g.now() <= deadline:
+            region = g.grab(x + 43, y - 90, min(x + 343, 647), y + 90)  # x 647: the panel's right edge
+            background = (region == TOOLTIP_BG).all(axis=2)
+            if background.any():
+                ys, xs = np.nonzero(background)
+                box = region[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+                cost_line = box[(box == SP_ICON).all(axis=2).any(axis=1)]
+                if (cost_line == COST_GREEN).all(axis=2).any():
+                    return True
+                if (cost_line == COST_RED).all(axis=2).any():
+                    return False
+            g.sleep(50)
+        return None
+
+    def jewel_offer_closed(self, name: str) -> bool:
+        """After Buy: if the jewel offer shows within 1 s, click its Close (never its box or its jewel
+        button) and return True."""
+        g = self.game
+        deadline = g.now() + 1000
+        while g.now() <= deadline:
+            if g.pixel_is(*MODAL_STATE, JEWEL_BUTTON) or g.pixel_is(583, 521, 0xFFFFFF):
+                g.click(758, 582)  # Close
+                event("Tree jewel offer closed", node=name)
+                g.save_frame("tree-jewel-offer")
+                self.wait_modal_gone()
+                return True
+            if self.modal() is None:
+                return False
+            g.sleep(10)
         return False
 
     def modal(self) -> str | None:
@@ -118,12 +183,16 @@ class Tree:
         return None
 
     def wait_modal_gone(self) -> bool:
+        """Wait up to 2 s until the modal is gone and the panel's dimming has faded out: its X tab is
+        AD1111 again (150202 under the modal, 3C0606 while it fades). A click meanwhile is lost: live on
+        2026-10-26, the check 222 ms after Village Key's Buy."""
         g = self.game
         deadline = g.now() + 2000
-        while self.modal() and g.now() <= deadline:
+        while g.now() <= deadline:
+            if self.modal() is None and g.pixel_is(538, 681, PANEL_X_RED):
+                return True
             g.sleep(10)
-        g.sleep(200)  # let it finish closing: a click during a panel's close can be lost (2026-10-25)
-        return self.modal() is None
+        return False
 
     def close_modal(self, x: int, y: int) -> bool:
         self.game.click(x, y)

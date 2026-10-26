@@ -1,6 +1,6 @@
 # Next steps (handoff of 2026-10-22)
 
-208 tests pass (`.venv/bin/python -m pytest -q`; 2026-10-26). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
+210 tests pass (`.venv/bin/python -m pytest -q`; 2026-10-26). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
 
 ## Log review of 2026-10-25 (last run: 2026-10-23 19:15 – 10-24 00:14, about 5 h)
 
@@ -102,8 +102,25 @@
       Belt, Sacred Book of Projectiles, Dangerous While Alone, Orange Ore, Yellow Ore, Money Laundering.
       Ancient Quests and Hot Desert are still to locate: at minimum zoom they seem to sit under the
       header.
-    - Unknown until its first live run: what Buy does without enough SP. The routine logs "Tree node not
-      bought" and saves a frame and a mark.
+    - **Live 2026-10-26 02:10: bought 7 nodes in 13.5 s** (Idle Earrings I and II, Blessing of Cronus,
+      Portals, Green Ore, Pink Ore, Soul Gem).
+    - The 02:07 run bought Village Key, but its check click came 222 ms after Buy, while the modal's
+      dimming was still fading, and was lost. The routine then stopped. Fix: `wait_modal_gone` waits
+      until the panel's X tab is AD1111 again (150202 under the modal, 3C0606 while fading).
+    - **Buy without enough SP opens a jewel offer** ("cover the missing amount with 💧5"). It has an
+      "I understand" box (white at 583, 521), a jewel button (094309 at 468, 571) that works only once the
+      box is ticked, and Close (758, 582). Jewels cost real money.
+      - At 02:11:05 it opened for Portal Traveler (200 SP, 95 available).
+      - Nothing was spent: no bot click lands on the box, and `close_all` closed the offer 0.3 s later
+        (its AF0000 check matched the offer's Close).
+    - Fix (FIXED 2026-10-26, tests incl. a lying tooltip): Buy is clicked only after the node's tooltip
+      shows its cost in green.
+      - The tooltip is a 262626 box from x + 43, centred on the pointer. Its cost digits are 11AA23 /
+        AD1111 on the row with the SP icon (6A31CA).
+      - "Unlocked" is 11AA23 too but has no SP icon.
+      - Checked on 26 recorded tooltips: 16 costs read right, 10 "Unlocked" never read as affordable.
+      - Red → stop without opening the modal. Not read → close the modal with Close and stop. A jewel
+        offer anyway → its Close, stop.
   - **`collect_minions` guarded (2026-10-26):**
     - After the UA its trigger still fired (00:08:38, 01:04:39) with no Minions tab.
     - Its claim clicks (318, 182) ×5 and (320, 280) ×5 then landed in the tree and opened modals; with
