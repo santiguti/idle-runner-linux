@@ -1,6 +1,141 @@
 # Next steps (handoff of 2026-10-22)
 
-167 tests pass (`.venv/bin/python -m pytest -q`). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
+208 tests pass (`.venv/bin/python -m pytest -q`; 2026-10-26). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
+
+## Log review of 2026-10-25 (last run: 2026-10-23 19:15 – 10-24 00:14, about 5 h)
+
+- **The user did the first Ultra Ascension** between 22:51 and 22:56 on 10-23, with 6 USP. Until the UA node
+  (2M SP) is rebought, the ascension panel has only one Ascend button, centred (client x about 210-430).
+  `auto_ascend` is on in the user's config (every 10 min).
+- **First automatic ascension, 23:16:38: correct.** It was a normal Ascend (+19 SP, +19%), checked in the
+  black box. The Ultra Ascend button didn't exist then, so the dangerous layout is still untested live.
+- **55 minutes without a single buy (23:16 – 00:12; 43 "AutoUpgrade shop not open").** Root cause:
+  - Right after the UA the shop has 5 tabs (Equipment, Upgrades, Jewels (purple drop), ⋮, X). There is
+    no Quests tab until Permanent Quests / Training Quests is bought.
+  - `claim_quests` clicked (1000, 690), which landed on the **Jewels shop (outfits bought with real
+    jewels)**. `tab_shown("quests")` is a negative test ("no buying tab showing"), so it passed, and the
+    loop wheeled there for 60 s ("stuck claim_quests"). It searched for green buttons the whole time and
+    found none; an affordable outfit's green button would have been clicked.
+  - After it closed that panel, a dark empty panel stayed over the shop area (client x 795-1280,
+    y 108-720) from 23:18:09 until the user opened and closed the crafting panel at 00:12. Every shop
+    click in between failed. With 4,489 coins, 5 green upgrades (10-1000) were never bought.
+  - **FIXED 2026-10-25** (tests on 6 recorded tab bars, `tests/fixtures/shop_tabs/`):
+    - `Shop.has_quests_tab` tells the bars apart by where the X tab starts (1200 vs 1184).
+    - `claim_quests` logs "Claim quests: no Quests tab" and closes the shop without clicking (1000, 690).
+    - `tab_shown("quests")` also needs the Jewels and ⋮ tabs unselected. The Quests tab turns gold, not
+      darker, when something can be claimed, so its own shade can't be used.
+    - Upgrades is checked at x = 915, inside it in both bars (897 was Equipment in the five-tab bar).
+  - **The dark panel had another cause, reproduced live on 2026-10-25 (FIXED):**
+    - It came back at 23:40:43, with six tabs and no Jewels click.
+    - Both times, `claim_quests` closed the shop and `auto_upgrade`'s blind "close the shop if it's open"
+      click hit the X tab 23 ms later, while the shop was still closing. The shop takes ~120 ms to close
+      (measured at about 30 fps).
+    - Reproduced on purpose: close, close again at +23 ms, open at +194 ms → dark panel. Close then open
+      at +194 ms → fine.
+    - The dark panel takes every click (shop button, its X). Opening and closing crafting doesn't clear
+      it. **Escape does** (2 of 2 times).
+    - **Escape without the dark panel opens "Exit Game — Are you sure?"** Its Yes (client 493-624 x
+      525-578) is where the Ascend dialog's Yes is. So Escape is not used as a recovery.
+    - Fix: `Shop.close_if_open` clicks the X only while the shop's white corner shows, then waits 300 ms
+      (was 150). Used by `auto_upgrade` and `claim_quests`.
+  - The claim trigger (shop-button glow) fired while no quests existed: the glow isn't only quests.
+- **Ascend by % never ascended live (2026-10-25 23:32, FIXED):**
+  - The bonus sample closes the panel, and `auto_ascend` clicked (95, 90) 21 ms later. That click was
+    lost ("Ascend skipped: ascend button not found", twice).
+  - `Shop.open_ascension_tab` now waits up to 2 s for the Ascend button and retries once. It clicks
+    (95, 90) only while the panel's X tab (538, 681, AD1111) is not showing: on the tree tab, (95, 90)
+    is the "Buy on Click" toggle.
+- **Tree session 2026-10-25** (user's OK to buy in wiki order; the bot frozen with SIGSTOP meanwhile):
+  - Tier 1 is complete.
+  - Tier 2 bought: Red Ore, Boost Coin, Cheap Cooldown, Augmented Soul Gatherer, then **Slowmo Bonus
+    (40) and Blue Ore (20)**, bought by Claude after one ascension (+53).
+  - Next in order: Green Ore 35, Pink Ore 50, Soul Gem 25, Doesn't Matter to Me 150, Portals 20 (the wiki:
+    as late as possible).
+  - The user bought Stones of Time on 10-26 and ascended by hand at about 01:00. The old bot's % ascend
+    had failed 11 times (00:30-00:57). The bot restarted with the fixed code at 01:03:58; its % ascend
+    isn't seen live yet.
+  - UI, measured:
+    - The panel opens on the Ascension tab; the tree tab is client (197, 665).
+    - **The tree keeps its last pan and zoom** (on 10-26 it opened where the user had left it).
+    - **Minimum zoom is a fixed layout:** 10 or 20 wheel notches down, from any pan or zoom, give the
+      same node positions (best alignment shift (0, 0); the rest is the rings' pulse). Use it.
+      - min-zoom client = 0.5 × default-view client + (42.5, 34.5), checked on 5 nodes.
+      - Nodes are ~25 px wide there, ~30 px apart.
+    - Dragging pans, with ~30 px of inertia.
+    - Hovering shows a tooltip (description, "Cost: N" red/green, or "Unlocked") after ~0.5 s.
+    - A click with "Buy on Click" off opens a modal: name, cost, rarity (LEGENDARY gold, ULTRA blue),
+      description. One pixel at client (460, 540) tells three states apart:
+      - 00A400 green: **Buy** (526, 551) / Close (750, 551). **The prerequisites are met, not
+        necessarily the SP**: Legendary Belt (350) showed Buy with 191 SP. Not yet measured: what Buy
+        does without enough SP.
+      - AF0000 red, one wide button, text "Can't buy yet" (white in x 556-600): a prerequisite is missing.
+      - AF0000 red, one wide button, text "Close" ("Unlocked | N"): already bought.
+      - The wide button (640, 551) closes either red modal.
+    - Ring colours aren't a state: green = unlockable, gold = LEGENDARY rarity, blue = post-UA (ULTRA).
+    - **(95, 90) on the tree tab is the "Buy on Click" toggle.** `collect_minions` clicks it blindly: never
+      leave the tree open while the bot runs.
+    - The wiki's v7.0.0 costs differ from the game's for some nodes.
+  - **Min-zoom map** (client coords, surveyed 10-26 with 191 SP; B = Buy, C = Can't buy yet, U = bought):
+    - Bought: Stones of Time (110, 152) U, Blue Ore (330, 177), Red Ore (270, 177), Slowmo (270, 257).
+    - Buyable: Village Key 3 (110, 182) B, Dangerous While Alone 35 (110, 212) B, Idle Earrings I 20
+      (140, 242) B, Money Laundering 25 (170, 122) B, Portals 20 (240, 122) B, Green Ore 35 (300, 217) B,
+      Legendary Belt 350 (240, 302) B.
+    - Locked: Idle Earrings II 25 (140, 272) C, Blessing of Cronus 50 (110, 272) C (path: Earrings I →
+      II → Blessing, by the drawn links), Dagger Edge 75 (170, 272) C, Orange Ore 5 (260, 197) C,
+      Yellow Ore 5 (340, 197) C, Soul Gem 25 (360, 217) C, Sacred Book of Projectiles (the Bow) 1,000
+      (300, 302) C, Stocks Buyer 50 (200, 122) C, Portal Traveler 200 (270, 122) C, Pink Ore 50
+      (330, 217) C.
+    - Not located yet: Ancient Quests, Hot Desert (the wiki: "at the very top"), Stability, Triple Shot,
+      Minions, Soul Slash.
+  - **`buy_tree` routine: DONE 2026-10-26, not yet run live** (`idle_runner/tree.py`, tests in
+    `tests/test_tree.py`). Setting `auto_buy_tree` (off by default).
+    - It runs once at start, after each ascension by the bot, and after "Coins reached 6" (an ascension
+      by hand).
+    - It opens the tree and wheels down 20 notches. Then for each node in `ORDER` it clicks the node's
+      min-zoom point and reads the modal:
+      - bought → close and go on;
+      - Buy → click it, wait for the modal to go, click the node again and expect "bought";
+      - otherwise → stop.
+    - Nodes seen bought are cached for the bot's run.
+    - The user's order (10-26): Village Key, Idle Earrings I, Idle Earrings II, Blessing of Cronus,
+      Portals (the user needs jellies now), Green Ore, Pink Ore, Soul Gem, Portal Traveler, Legendary
+      Belt, Sacred Book of Projectiles, Dangerous While Alone, Orange Ore, Yellow Ore, Money Laundering.
+      Ancient Quests and Hot Desert are still to locate: at minimum zoom they seem to sit under the
+      header.
+    - Unknown until its first live run: what Buy does without enough SP. The routine logs "Tree node not
+      bought" and saves a frame and a mark.
+  - **`collect_minions` guarded (2026-10-26):**
+    - After the UA its trigger still fired (00:08:38, 01:04:39) with no Minions tab.
+    - Its claim clicks (318, 182) ×5 and (320, 280) ×5 then landed in the tree and opened modals; with
+      "Buy on Click" on they would buy nodes.
+    - It now opens the panel with `actions.open_ascension_tab`, shared with the shop and the tree. It
+      claims only if the Minions tab shows selected at (332, 676); the empty bar there is 3E260A.
+    - The selected Minions tab itself isn't measured (no Minions node yet). If minions stop being
+      collected once the node is bought, measure it.
+- **Ascend by %: DONE 2026-10-25.**
+  - `idle_runner/ascend_bonus.py` reads the Ascend button's second line. The game shrinks the font to
+    fit (14-16 px tall), so glyphs are area-averaged to 14x10 and compared by correlation.
+  - Templates: `bonus_glyphs.py`, from the 39 readable samples (`logs/frames/*-ascend-bonus.png`).
+  - Checked on all 50 samples: 50/50. In leave-one-out (each frame read without its own shapes) 44/50
+    are right and the 6 misses are "7", which has a single shape: they read as None, never as a wrong
+    number.
+  - `sample_ascend_bonus` logs "Ascend bonus" with `percent`. "Ascend bonus unreadable" saves a frame
+    and a black-box mark: add its glyphs then.
+  - New setting `auto_ascend_percent` (0 = off) ascends at the first sample that reaches it, and
+    `auto_ascend_minutes` stays as the cap. It needs `ascend_bonus_sample_minutes > 0`.
+  - Post-UA curve: 0% → 3% (23:06) → 15% (23:11) → 19% (23:16).
+- **Coin reader** after the UA: the counter shows "1,027", "4,489"; it read 7.0 / 6.0 and fired
+  "Coins reached 6" every ~10 min. The comma isn't a glyph yet (extra buys only, harmless).
+- **Minions Collect** fired 90 times in 20:21–23:18 (pre-UA), often 3–7 s apart: the (99, 113) trigger
+  stays on after the routine. No frames kept (the black box only holds 23:13+). Irrelevant until the
+  Minions node (1,200 SP) is rebought.
+- **Ascension tree UI** (black box 10-24 00:12–00:14, the user buying): a zoomable, pannable node graph
+  in the left panel (client x 0-630). The header reads "N available" and "Ascend to claim: +N". Nodes are
+  about 50 px: magenta = bought, green ring = buyable, gold / grey / blue (new post-UA nodes) = other
+  states. Clicking a node opens a modal with its name, cost and "Buy". A "Buy on Click" toggle sits at
+  the top left. Tier list parsed from the wiki (301 rows incl. "First Ultra Ascension"); the wiki's
+  Ultra_Ascension_Strategy reorders the early post-UA priorities (souls, Stones of Time, Blessing of
+  Cronus; skip CpS; Portals late).
 
 ## 0. Plan agreed with the user on 2026-10-22 (evening), in this order
 
@@ -63,7 +198,8 @@ routine with verified waits.
 
 ## How to resume
 
-- `config.toml` (git-ignored) is still the live-test config: the defaults plus `auto_buy_upgrades = true` and `auto_buy_minutes = 1`. Auto-ascend is off.
+- `config.toml` (git-ignored) is the user's, edited in the window: auto-buy every 2 min, auto-ascend off, perfect chest hunt, `ascend_bonus_sample_minutes = 5`. Don't edit it while the window is open.
+- Night of 2026-10-23 (00:17–01:44, 54 buys): 3 "Shop tab not shown" (upgrades, buy aborted; black-box marks kept), 5 "Shop click retried", 2 BS2 sync timeouts (s3, s4), 0 ascend-bonus samples (the setting had been lost).
 - Live tests: don't ask the user questions mid-run, because every switch to VS Code unfocuses the game and aborts the running minigame. Get consent first, then act and report. **Ascending is irreversible: ask before the session starts.**
 - If KDE shows a "remote control" permission dialog, the bot pauses; the user accepts it and refocuses the game.
 - Recordings and measuring scripts are in `logs/recordings/2026-10-22/` (git-ignored):

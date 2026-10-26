@@ -21,8 +21,10 @@ class Settings:
     auto_buy_minutes: float = 10
     auto_ascend: bool = False
     auto_ascend_minutes: float = 10
+    auto_ascend_percent: float = 0
     post_ascend_first_buy_seconds: int = 15
     ascend_bonus_sample_minutes: float = 0
+    auto_buy_tree: bool = False
     # [minigames]
     skip_bonus_stage: bool = False
     no_lockpicking: bool = True
@@ -46,7 +48,8 @@ SECTIONS: dict[str, tuple[str, ...]] = {
     "game": ("window_name", "offset_x", "offset_y", "color_tolerance"),
     "general": ("jump_interval_ms", "circle_portals", "circle_portals_count", "disable_rage_without_soul_bonus",
                 "auto_buy_upgrades", "auto_buy_minutes", "auto_ascend", "auto_ascend_minutes",
-                "post_ascend_first_buy_seconds", "ascend_bonus_sample_minutes"),
+                "auto_ascend_percent", "post_ascend_first_buy_seconds", "ascend_bonus_sample_minutes",
+                "auto_buy_tree"),
     "minigames": ("skip_bonus_stage", "no_lockpicking", "no_reinforced_crystal_saver", "perfect_chest_hunt"),
     "crafting": ("craft_soul_bonus", "craft_rage_pill", "craft_dimensional_staff", "craft_bidimensional_staff"),
     "debug": ("log_dir", "log_level", "save_frames", "blackbox_fps", "blackbox_minutes"),
@@ -96,6 +99,10 @@ def check_ranges(path: Path, s: Settings) -> None:
         problems.append("auto_buy_minutes and auto_ascend_minutes must be > 0")
     if s.ascend_bonus_sample_minutes < 0:
         problems.append("ascend_bonus_sample_minutes must be >= 0")
+    if s.auto_ascend_percent < 0:
+        problems.append("auto_ascend_percent must be >= 0")
+    if s.auto_ascend_percent and not s.ascend_bonus_sample_minutes:
+        problems.append("auto_ascend_percent needs ascend_bonus_sample_minutes > 0 (that's when it is read)")
     if s.post_ascend_first_buy_seconds < 0:
         problems.append("post_ascend_first_buy_seconds must be >= 0")
     if not 0 <= s.color_tolerance <= 255:

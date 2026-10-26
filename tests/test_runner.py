@@ -90,6 +90,21 @@ def test_ascend_bonus_is_sampled_on_the_slow_tick_after_its_interval(game, fake,
     assert "Ascend bonus not shown" in event_names()  # the fake screen has no ascension panel
 
 
+@pytest.mark.parametrize(("bonus", "ascends"), [(12.0, True), (10.0, True), (8.0, False), (None, False)])
+def test_auto_ascend_when_the_sampled_bonus_reaches_its_percent(game, fake, jumper, monkeypatch,
+                                                                bonus: float | None, ascends: bool) -> None:
+    settings = replace(Settings(), auto_ascend=True, auto_ascend_minutes=60, auto_ascend_percent=10,
+                       ascend_bonus_sample_minutes=0.1)
+    runner = Runner(game, settings, jumper)
+    ascended = []
+    monkeypatch.setattr(runner.shop, "sample_ascend_bonus", lambda: bonus)
+    monkeypatch.setattr(runner.shop, "auto_ascend", lambda: ascended.append(fake.t) is None)
+    fake.t += 7_000
+    runner.tick()  # the 60-minute timer isn't due
+
+    assert bool(ascended) is ascends
+
+
 def test_focus_loss_mid_routine_aborts_without_more_input(game, fake, jumper, event_names) -> None:
     fake.paint(99, 113, 0xFFFF7A)  # minions are back
 
@@ -383,6 +398,42 @@ def test_buys_as_soon_as_coins_reach_six_after_an_ascension(game, fake, jumper, 
 
     assert len(buys) == 1 and "Coins reached 6" in event_names()
     assert runner.buy_minutes == 0.25  # then the post-ascension ramp, from this buy
+
+
+def test_tree_is_bought_at_start_and_after_each_ascension(game, fake, jumper, monkeypatch) -> None:
+    settings = replace(Settings(), auto_buy_tree=True, auto_ascend=True, auto_ascend_minutes=1)
+    runner = Runner(game, settings, jumper)
+    runs = []
+    monkeypatch.setattr(runner.tree, "buy", lambda: runs.append(fake.t))
+    monkeypatch.setattr(runner.shop, "auto_ascend", lambda: True)
+    fake.t += 6_000
+    runner.tick()  # first slow tick: the user may have ascended by hand before the bot started
+    fake.t += 6_000
+    runner.tick()
+    assert len(runs) == 1
+
+    fake.t += 61_000
+    runner.tick()  # ascends, then buys
+    assert len(runs) == 2
+
+
+def test_tree_is_bought_after_an_ascension_by_hand(game, fake, jumper, monkeypatch) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True, auto_buy_tree=True), jumper)
+    runner.tree_due = False
+    monkeypatch.setattr(runner.shop, "auto_upgrade", lambda: True)
+    run_ticks_reading(runner, fake, monkeypatch, [0.0, 7.5])  # the counter starts again from 0
+
+    assert runner.tree_due
+
+
+def test_tree_is_not_bought_unless_enabled(game, fake, jumper, monkeypatch) -> None:
+    runner = Runner(game, Settings(), jumper)
+    runs = []
+    monkeypatch.setattr(runner.tree, "buy", lambda: runs.append(fake.t))
+    fake.t += 6_000
+    runner.tick()
+
+    assert runs == []
 
 
 def test_no_six_coin_buy_without_a_low_reading_first(game, fake, jumper, monkeypatch) -> None:

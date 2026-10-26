@@ -16,6 +16,7 @@ from idle_runner.minigames.ascending_heights import ascending_heights
 from idle_runner.portals import portal_ready, take_portal
 from idle_runner.repeater import Repeater
 from idle_runner.shop import Shop
+from idle_runner.tree import Tree
 from idle_runner.x11 import GameUnavailable, WindowGone
 
 EXPECTED_SIZE = (1280, 720)
@@ -38,6 +39,8 @@ class Runner:
         self.s = settings
         self.jumper = jumper
         self.shop = Shop(game)
+        self.tree = Tree(game)
+        self.tree_due = settings.auto_buy_tree  # once at start: the user may have ascended by hand
         now = game.now()
         self.last_slow = now
         self.timer_buy = now
@@ -172,18 +175,27 @@ class Runner:
                 self.buy()
             elif self.retry_buy_at is not None and g.now() >= self.retry_buy_at:
                 self.buy()
+            bonus = None
             if (s.ascend_bonus_sample_minutes
                     and g.now() - self.timer_bonus_sample > s.ascend_bonus_sample_minutes * 60_000):
                 self.timer_bonus_sample = g.now()
-                self._routine("ascend_bonus_sample", self.shop.sample_ascend_bonus)
-            if s.auto_ascend and g.now() - self.timer_ascend > s.auto_ascend_minutes * 60_000:
+                bonus = self._routine("ascend_bonus_sample", self.shop.sample_ascend_bonus)
+            # Not in the original: also ascend once the bonus reaches auto_ascend_percent (the wiki's rule).
+            reached = bool(s.auto_ascend_percent) and bonus is not None and bonus >= s.auto_ascend_percent
+            if s.auto_ascend and (reached or g.now() - self.timer_ascend > s.auto_ascend_minutes * 60_000):
+                if reached:
+                    event("Ascend bonus reached", percent=bonus)
                 self.timer_ascend = g.now()
                 self.shop.loop_amount = 0  # the original left this at its last value
                 ascended = self._routine("auto_ascend", self.shop.auto_ascend)
+                self.tree_due = self.tree_due or ascended
                 if ascended and s.post_ascend_first_buy_seconds:
                     self.timer_buy = g.now()
                     self.buy_minutes = s.post_ascend_first_buy_seconds / 60
                     event("Post-ascend buy ramp", first_buy_seconds=s.post_ascend_first_buy_seconds)
+            if s.auto_buy_tree and self.tree_due:  # not in the original (2026-10-26)
+                self.tree_due = False
+                self._routine("buy_tree", self.tree.buy)
 
     def buy(self) -> None:
         """AutoUpgrade; if a Random Box stopped it, buy again in BOX_RETRY_MS (after the jumper got the
@@ -211,6 +223,7 @@ class Runner:
         else:
             event("Coins reached 6", coins=coins)
         self.coins_low_since = None
+        self.tree_due = True  # an ascension, maybe by hand: there is SP to spend
         self.buy()
         self.timer_buy = g.now()
         if s.post_ascend_first_buy_seconds:

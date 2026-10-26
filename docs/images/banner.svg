@@ -37,6 +37,6 @@
     <rect x="604" y="104" width="152" height="64" fill="#0b3954"/>
     <text x="620" y="150" font-size="40" fill="#f5c542">LINUX</text>
     <text x="82" y="214" font-size="24" fill="#0b3954">An Idle Slayer bot that plays by looking at the screen</text>
-    <text x="82" y="246" font-size="18" fill="#0b3954">ported from Devil4ngle's AutoIt script</text>
+    <text x="82" y="246" font-size="18" fill="#0b3954">for the native Linux build of Idle Slayer</text>
   </g>
 </svg>

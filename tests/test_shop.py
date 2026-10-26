@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from idle_runner.actions import open_ascension_tab
 from idle_runner.shop import QUEST_REWARD_BLUE, BoxOnScreen, Shop, first_row_after_quest_rewards, scroll_to_top
 from tests.fakes import OFFSET, read_png
 
@@ -12,14 +13,53 @@ def client_click(x: int, y: int) -> tuple:
 
 
 def show_tab(fake, tab: str) -> None:
-    """Paint the shop's tab bar as measured on 2026-10-22: the selected tab is darker, and only the
-    Upgrades tab has the grey "Buy all available" bar at (1180, 636)."""
+    """Paint the shop's six-tab bar as measured on 2026-10-22/25: the X tab's red (1200-1268), the selected
+    tab darker, and only the Upgrades tab has the grey "Buy all available" bar at (1180, 636). "quests"
+    paints no buying tab: the blank fake has no selected tab elsewhere."""
+    fake.paint(1210, 700, 0xA61010)
     if tab == "upgrades":
-        fake.paint(897, 700, 0x5A251A)
+        fake.paint(915, 700, 0x5A251A)
         fake.paint(1180, 636, 0xA8A8A8)
     elif tab == "armor":
         fake.paint(820, 700, 0x5E261B)
         fake.paint(1180, 636, 0x898989)
+
+
+def paint_tab_bar(fake, name: str) -> None:
+    """A tab bar recorded live (tests/fixtures/shop_tabs: client x 780-1279, y 600-719, so it holds the
+    "Buy all" / "Max" pixel too). "6-..." has all six tabs; "5-..." is right after an Ultra Ascension,
+    without the Quests tab, where every tab is wider. The rest of the name is the tab shown."""
+    fake.paint(807, 145, 0xFFFFFF)  # the shop is open
+    fake.frame[600:720, 780:1280] = read_png(Path(__file__).parent / "fixtures" / "shop_tabs" / f"{name}.png")
+
+
+@pytest.mark.parametrize("name, shown", [
+    ("6-armor", "armor"), ("6-upgrades", "upgrades"), ("6-quests", "quests"), ("6-quests-gold", "quests"),
+    ("5-upgrades", "upgrades"), ("5-jewels", None)])
+def test_tab_shown_on_recorded_tab_bars(game, fake, name: str, shown: str | None) -> None:
+    paint_tab_bar(fake, name)
+    shop = Shop(game)
+
+    showing = [tab for tab in ("armor", "upgrades", "quests") if shop.tab_shown(tab, timeout_ms=100)]
+    assert showing == ([shown] if shown else [])
+
+
+@pytest.mark.parametrize("x", [1050, 1130])  # Jewels, "⋮"
+def test_quests_is_not_shown_while_another_non_buying_tab_is_selected(game, fake, x: int) -> None:
+    paint_tab_bar(fake, "6-quests")
+    fake.paint(972, 700, 0x883424, w=18)  # Quests no longer selected...
+    fake.paint(x, 700, 0x5A251A)          # ...this tab is
+
+    assert not Shop(game).tab_shown("quests", timeout_ms=100)
+
+
+def test_claim_quests_never_clicks_where_quests_would_be_without_a_quests_tab(game, fake, event_names) -> None:
+    paint_tab_bar(fake, "5-upgrades")  # (1000, 690) is the Jewels shop here (outfits bought with jewels)
+    Shop(game).claim_quests()
+
+    assert (1000, 690) not in fake.clicks()
+    assert "Claim quests: no Quests tab" in event_names()
+    assert fake.clicks()[-1] == (1244, 712)
 
 
 ROW_ICONS = {"vm": 0xF4B41B, "svm": 0xE478FF}  # Vertical Magnet / Special Vertical Magnet icon colours
@@ -91,7 +131,7 @@ def test_buy_upgrade_skips_the_excluded_upgrades(game, fake) -> None:
 def test_auto_upgrade_logs_when_the_shop_does_not_open(game, fake, event_names) -> None:
     Shop(game).auto_upgrade()
 
-    assert fake.clicks() == [(1244, 712), (1163, 655), (1163, 655)]  # the second: a lost click is retried once
+    assert fake.clicks() == [(1163, 655), (1163, 655)]  # the second: a lost click is retried once
     assert "AutoUpgrade shop not open" in event_names()
     assert "AutoUpgrade Done" in event_names()
 
@@ -108,6 +148,7 @@ def test_stuck_scrollbar_is_reported_instead_of_looping_forever(game, fake, even
 
 def test_claim_quests_clicks_green_claim_buttons(game, fake, event_names) -> None:
     fake.paint(807, 145, 0xFFFFFF)  # the shop is open
+    show_tab(fake, "quests")
     fake.paint(1160, 300, 0x11A622)
     fake.on_action = lambda a: fake.paint(1160, 300, 0) if a == client_click(1160, 300) else None
     Shop(game).claim_quests()
@@ -141,7 +182,7 @@ def test_auto_ascend_when_the_panel_is_already_open(game, fake, event_names) -> 
     ascend_dialog_on_click(fake, 0x00A400)
 
     assert Shop(game).auto_ascend() is True
-    assert fake.clicks()[:4] == [(260, 600), (598, 581), (1244, 712), (1163, 655)]
+    assert fake.clicks()[:3] == [(260, 600), (598, 581), (1163, 655)]  # the shop is closed: no X click
     assert "Ascended" in event_names()
 
 
@@ -184,13 +225,14 @@ def test_auto_ascend_repeats_a_lost_confirm_click(game, fake, event_names) -> No
 
 def test_auto_ascend_logs_and_saves_a_frame_when_the_button_is_missing(game, fake, event_names) -> None:
     assert Shop(game).auto_ascend() is False
-    assert fake.clicks() == [(95, 90), (93, 680)]
+    assert fake.clicks() == [(95, 90), (93, 680), (95, 90), (93, 680)]  # the open is retried once
     assert "Ascend skipped" in event_names()
     assert "frame" in event_names()
 
 
 def test_claim_quests_saves_frames_of_what_it_saw(game, fake, events) -> None:
     fake.paint(807, 145, 0xFFFFFF)  # the shop is open, with nothing to claim
+    show_tab(fake, "quests")
     Shop(game).claim_quests()
 
     labels = [r["label"] for r in events() if r["event"] == "frame"]
@@ -297,7 +339,7 @@ def test_claim_quests_waits_for_a_slow_shop_before_clicking_tabs(game, fake) -> 
 def test_claim_quests_stops_when_the_shop_never_opens(game, fake, event_names) -> None:
     Shop(game).claim_quests()
 
-    assert fake.clicks() == [(1244, 712), (1163, 655), (1163, 655)]  # the second: a lost click is retried once
+    assert fake.clicks() == [(1163, 655), (1163, 655)]  # the second: a lost click is retried once
     assert "Claim quests: shop not open" in event_names()
 
 
@@ -393,6 +435,40 @@ def ignore_first_click_at(fake, x: int, y: int, then) -> None:
     fake.on_action = on_action
 
 
+def test_routines_click_the_shop_x_only_while_the_shop_is_open(game, fake) -> None:
+    # Reproduced 2026-10-25: a click on the X tab while the shop is still closing (the routine before had
+    # closed it 23 ms earlier) leaves an empty dark panel over the shop that takes every click until Escape.
+    Shop(game).auto_upgrade()
+    Shop(game).claim_quests()
+
+    assert (1244, 712) not in fake.clicks()
+
+
+def test_closing_a_shop_left_open_waits_for_it_before_opening_it_again(game, fake) -> None:
+    fake.paint(807, 145, 0xFFFFFF)  # left open
+    first_click_at: dict[tuple, float] = {}
+    fake.on_action = lambda a: first_click_at.setdefault(a, fake.t)
+    Shop(game).claim_quests()
+
+    assert first_click_at[client_click(1163, 655)] - first_click_at[client_click(1244, 712)] >= 300  # closes in ~120 ms
+
+
+def test_open_ascension_tab_clicks_again_when_the_panel_does_not_open(game, fake, event_names) -> None:
+    # Seen live on 2026-10-25: the click that reopened the panel 21 ms after the bonus sample closed it.
+    ignore_first_click_at(fake, 95, 90, lambda: fake.paint(260, 480, 0x58188D))
+
+    assert open_ascension_tab(game) is True
+    assert fake.clicks() == [(95, 90), (93, 680), (95, 90), (93, 680)]
+    assert "Shop click retried" in event_names()
+
+
+def test_open_ascension_tab_never_clicks_the_ascension_button_while_the_panel_is_open(game, fake) -> None:
+    fake.paint(538, 681, 0xAD1111)  # the panel's X tab: open, here on the tree, where (95, 90) is "Buy on Click"
+
+    assert open_ascension_tab(game) is False
+    assert (95, 90) not in fake.clicks()
+
+
 def test_auto_upgrade_clicks_the_shop_button_again_when_a_click_is_lost(game, fake, event_names,
                                                                         monkeypatch) -> None:
     ignore_first_click_at(fake, 1163, 655, lambda: fake.paint(807, 145, 0xFFFFFF))
@@ -416,7 +492,8 @@ def test_buy_upgrade_clicks_the_tab_again_when_a_click_is_lost(game, fake, event
 
 
 def test_claim_quests_stops_scrolling_up_while_the_list_bounces_at_the_top(game, fake) -> None:
-    fake.paint(807, 145, 0xFFFFFF)  # shop open, Quests tab showing (the blank fake has no buying tab)
+    fake.paint(807, 145, 0xFFFFFF)  # shop open...
+    show_tab(fake, "quests")         # ...on the Quests tab
     fake.paint(1254, 160, 0xB7B7B7)  # thumb at the top of the track...
     fake.paint(1254, 267, 0xA0A0A0)  # ...but shrunk by the elastic overscroll, so 267 shows the track
     notches_up = []
@@ -539,16 +616,31 @@ def test_ascend_dialog_on_recorded_frames(game, fake, name: str, expected: int |
     assert Shop(game).ascend_dialog() == expected
 
 
-def test_sample_ascend_bonus_saves_the_panel_and_closes_it(game, fake, events) -> None:
+def test_sample_ascend_bonus_reads_and_logs_the_bonus_then_closes_the_panel(game, fake, events) -> None:
+    panel = read_png(Path(__file__).parent / "fixtures" / "ascend_bonus" / "one-15.png")
+
+    def open_tab(action: tuple) -> None:
+        if action == client_click(93, 680):
+            fake.frame[440:600, 80:450] = panel
+
+    fake.on_action = open_tab
+
+    assert Shop(game).sample_ascend_bonus() == 15.0
+    assert fake.clicks() == [(95, 90), (93, 680), (570, 694)]
+    assert [r for r in events() if r["event"] == "Ascend bonus"][0]["percent"] == 15.0
+    assert not [r for r in events() if r["event"] == "frame"]
+
+
+def test_sample_ascend_bonus_saves_a_frame_it_cannot_read(game, fake, events) -> None:
     fake.on_action = lambda a: fake.paint(260, 480, 0x58188D) if a == client_click(93, 680) else None
 
-    assert Shop(game).sample_ascend_bonus() is True
-    assert fake.clicks() == [(95, 90), (93, 680), (570, 694)]
-    assert [e["label"] for e in events() if e["event"] == "frame"] == ["ascend-bonus"]
+    assert Shop(game).sample_ascend_bonus() is None
+    assert "Ascend bonus unreadable" in [r["event"] for r in events()]
+    assert [r["label"] for r in events() if r["event"] == "frame"] == ["ascend-bonus-unreadable"]
 
 
 def test_sample_ascend_bonus_reports_a_panel_that_doesnt_show(game, fake, event_names) -> None:
-    assert Shop(game).sample_ascend_bonus() is False
+    assert Shop(game).sample_ascend_bonus() is None
     assert fake.clicks()[-1] == (570, 694)
     assert "Ascend bonus not shown" in event_names()
 

@@ -18,12 +18,17 @@ circle_portals_count = 7                 # first destination: 1 hills, 2 hot des
 disable_rage_without_soul_bonus = false  # don't rage at Megahordes unless Soul Bonus is active
 auto_buy_upgrades = false                # buy upgrades and equipment every auto_buy_minutes
 auto_buy_minutes = 10                    # how often to buy, once auto_buy_upgrades is on
-auto_ascend = false                      # ascend every auto_ascend_minutes (irreversible)
+auto_ascend = false                      # ascend every auto_ascend_minutes or at auto_ascend_percent
+                                         # (irreversible)
 auto_ascend_minutes = 10                 # how often to ascend, once auto_ascend is on
+auto_ascend_percent = 0                  # also ascend as soon as the Ascend button shows at least this
+                                         # "+X% CpS bonus" (read every ascend_bonus_sample_minutes; 0 = off)
 post_ascend_first_buy_seconds = 15       # after ascending, buy this soon, then double the wait up to
                                          # auto_buy_minutes (0 = original behaviour)
-ascend_bonus_sample_minutes = 0          # save the Ascend button's "+X% CpS bonus" this often, to learn
-                                         # to read it (0 = off)
+ascend_bonus_sample_minutes = 0          # read the Ascend button's "+X% CpS bonus" this often and log it
+                                         # (0 = off)
+auto_buy_tree = false                    # buy Ascension Tree nodes (spends SP) in the order listed in
+                                         # idle_runner/tree.py: at start and after each ascension
 
 [minigames]
 skip_bonus_stage = false                 # don't play bonus stages, wait for them to end

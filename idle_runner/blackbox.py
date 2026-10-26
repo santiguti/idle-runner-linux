@@ -30,7 +30,8 @@ ANOMALIES = frozenset({
     "AutoUpgrade shop not open", "Claim quests: shop not open", "Upgrade click had no effect",
     "Shopping stopped for a Random Box", "Ascend skipped", "Coins reading timed out",
     "Chesthunt saver not found", "Life saver skipped: saver not found", "Portal destination not found",
-    "Ascending Heights timed out after 4 minutes", "Ascend bonus not shown",
+    "Ascending Heights timed out after 4 minutes", "Ascend bonus not shown", "Ascend bonus unreadable",
+    "Tree not shown", "Tree node not bought",
 })
 
 

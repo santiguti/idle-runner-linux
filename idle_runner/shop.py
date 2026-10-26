@@ -1,7 +1,8 @@
 """Shop routines ported from Idle Runner.au3: AutoUpgrade, BuyUpgrade, BuyEquipment, ClaimQuests, AutoAscend."""
 import numpy as np
 
-from idle_runner.actions import box_on_screen
+from idle_runner.actions import TAB_SELECTED, box_on_screen, open_ascension_tab
+from idle_runner.ascend_bonus import read_ascend_bonus
 from idle_runner.game import STUCK_MS, Game, Point
 from idle_runner.log import event
 
@@ -11,9 +12,13 @@ SCROLLBAR_GRAY = 0xD6D6D6  # scrollbar track at x = 1260
 SCROLLBAR_TRACK_1254 = 0xA0A0A0
 # Shop tabs (measured 2026-10-22): the selected tab's background is darker, and only the Upgrades tab
 # has the grey "Buy all available" bar where the Equipment tab has its "Max" button (1180, 636).
-TAB_SELECTED = 0x5E261B            # ±6: it fades between 5A251A and 62271C; unselected tabs are 85-8E red
-#                                    at (820, 700) for Equipment, (897, 700) for Upgrades
 BUY_ALL_BAR = 0xA5A5A5             # A1A1A1-A8A8A8 at (1180, 636)
+# The tab bar on y = 700 (measured 2026-10-25, before and after the Ultra Ascension):
+#   six tabs:  Equipment 820-889, Upgrades 896-965, Quests 972-1041, Jewels 1048-1117, ⋮ 1124-1192, X 1200-1268
+#   five tabs: Equipment 820-904, Upgrades 911-995, Jewels 1002-1086, ⋮ 1093-1177, X 1184-1268
+# The five-tab bar shows until quests are unlocked again after an Ultra Ascension. There, the Quests click
+# (1000, 690) opens the Jewels shop (outfits bought with jewels).
+X_TAB_RED = 0xA61010
 # Not in the original (measured 2026-10-22): event quests (new on 2026-10-21) put their rewards at the
 # top of the Upgrades list as blue "Quest Reward" rows that can't be bought.
 QUEST_REWARD_BLUE = 0x0B6BA1  # their background, at x = 1130
@@ -98,6 +103,19 @@ class Shop:
         self.upgrades_bought = 0
         self.equipment_buys = 0
 
+    def close_if_open(self) -> None:
+        """Close the shop if it's open, then wait for it to finish closing.
+
+        The original clicked (1244, 712) blindly. Reproduced on 2026-10-25: a click on the X tab while
+        the shop is still closing (the routine before had closed it 23 ms earlier) leaves an empty dark
+        panel over the shop that takes every click until Escape (no buys for 55 minutes on 2026-10-23).
+        The shop takes about 120 ms to close; the original slept 150 ms.
+        """
+        g = self.game
+        if g.pixel_search(807, 140, 807, 155, 0xFFFFFF):  # the shop's corner, as in open_shop
+            g.click(1244, 712)
+        g.sleep(300)
+
     def open_shop(self) -> bool:
         """Click the shop button and wait for the shop's corner; click once more if it doesn't show.
 
@@ -136,18 +154,24 @@ class Shop:
         meant for one tab then lands on another: "Max" in Equipment is "Buy all available" in
         Upgrades, and a green "Claim" in Quests is a green "Unlock" in Upgrades (this bought the
         Vertical Magnet on 2026-10-22). Requires two matching reads 50 ms apart (the tab fades in).
+        x = 820 and 915 are inside Equipment and Upgrades in both tab bars (see X_TAB_RED).
         """
         g = self.game
 
+        def selected(x: int) -> bool:
+            return g.pixel_search(x, 700, x, 700, TAB_SELECTED, variation=6) is not None
+
         def showing() -> bool:
-            armor = g.pixel_search(820, 700, 820, 700, TAB_SELECTED, variation=6) is not None
-            upgrades = g.pixel_search(897, 700, 897, 700, TAB_SELECTED, variation=6) is not None
+            armor = selected(820)
+            upgrades = selected(915)
             buy_all = g.pixel_search(1180, 636, 1180, 636, BUY_ALL_BAR, variation=4) is not None
             if tab == "armor":
                 return armor and not buy_all
             if tab == "upgrades":
                 return upgrades and buy_all
-            return not (armor or upgrades or buy_all)  # quests: no tab that buys is showing
+            # Quests turns gold instead of darker when something can be claimed, so it is the selected tab
+            # when the bar has it and no other tab is selected: not Jewels (1050) or ⋮ (1130) either.
+            return self.has_quests_tab() and not (armor or upgrades or buy_all or selected(1050) or selected(1130))
 
         deadline = g.now() + timeout_ms
         while g.now() <= deadline:
@@ -157,6 +181,11 @@ class Shop:
                     return True
             g.sleep(10)
         return False
+
+    def has_quests_tab(self) -> bool:
+        """The tab bar shows and has the Quests tab: the X tab starts at 1200 (six tabs), not 1184."""
+        g = self.game
+        return g.pixel_is(1210, 700, X_TAB_RED) and not g.pixel_is(1190, 700, X_TAB_RED)
 
     def row_around(self, y: int) -> tuple[int, int] | None:
         """The Upgrades row whose buy button holds (1180, y): its first and last pixel rows, or None if
@@ -188,8 +217,7 @@ class Shop:
         event("AutoUpgrade Active")
         self.upgrades_bought = 0
         self.equipment_buys = 0
-        g.click(1244, 712)  # close the shop window if it's open
-        g.sleep(150)
+        self.close_if_open()
         completed = True
         if self.open_shop():
             try:
@@ -286,8 +314,7 @@ class Shop:
     def claim_quests(self) -> None:
         g = self.game
         event("Claiming quest")
-        g.click(1244, 712)  # close the shop window if it's open
-        g.sleep(150)
+        self.close_if_open()
         if not self.open_shop():  # not in the original, which clicked on regardless
             event("Claim quests: shop not open")
             g.save_frame("claim-shop-not-open")
@@ -295,6 +322,11 @@ class Shop:
         g.click(850, 690)  # armor tab
         g.click(927, 683)  # upgrades tab
         g.sleep(150)
+        if not self.has_quests_tab():  # not in the original: (1000, 690) would open the Jewels shop
+            event("Claim quests: no Quests tab")
+            g.save_frame("claim-no-quests-tab")
+            g.click(1244, 712)  # close the shop
+            return
         if not self.select_tab("quests", 1000, 690, sleep_ms=50):
             g.click(1244, 712)  # close the shop
             return
@@ -325,38 +357,30 @@ class Shop:
         g.save_frame("claim-quests-end")
         g.click(1244, 712)  # close the shop
 
-    def sample_ascend_bonus(self) -> bool:
-        """Open the Ascension tab, save a frame of it and close the panel. Not in the original.
-
-        The Ascend button reads "+X% CpS bonus.", which is SP gained by ascending / SP earned so far, the
-        wiki's measure of when to ascend. These frames are the samples for reading it (step 3 in
-        docs/next-steps.md). Its text is pure white; the button's stars never are (measured 2026-10-23).
-        """
+    def sample_ascend_bonus(self) -> float | None:
+        """Open the Ascension tab, read the Ascend button's "+X% CpS bonus" and close the panel. Not in
+        the original. Returns the % (0.0 for "+0"), or None when the panel didn't show or can't be read;
+        an unreadable one saves a frame, to add its glyphs to idle_runner/bonus_glyphs.py."""
         g = self.game
-        g.click(95, 90)  # ascension button
-        g.sleep(400)
-        g.click(93, 680)  # ascension tab
-        g.sleep(400)
-        shown = g.find_until(260, 480, 260, 480, 0x58188D, timeout_ms=2000) is not None  # Ascend button
-        if shown:
-            g.save_frame("ascend-bonus")
-        else:
+        bonus = None
+        if not open_ascension_tab(g):
             event("Ascend bonus not shown")
             g.save_frame("ascend-bonus-not-shown")
+        elif (bonus := read_ascend_bonus(g)) is None:
+            event("Ascend bonus unreadable")
+            g.save_frame("ascend-bonus-unreadable")
+        else:
+            event("Ascend bonus", percent=bonus)
         g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
-        return shown
+        return bonus
 
     def auto_ascend(self) -> bool:
         """Ascend and run one AutoUpgrade. Returns False when it didn't ascend."""
         g = self.game
         if g.pixel_is(260, 600, 0x58188D):  # the ascension panel is already open
             return self._ascend("panel_open")
-        g.click(95, 90)  # ascension button
-        g.sleep(400)
-        g.click(93, 680)  # ascension tab
-        g.sleep(400)
         # Known issue kept from the original: it checks y = 480 but clicks y = 600.
-        if g.pixel_is(260, 480, 0x58188D):
+        if open_ascension_tab(g):
             return self._ascend("opened_panel")
         event("Ascend skipped", reason="ascend button not found")
         g.save_frame("ascend-not-found")

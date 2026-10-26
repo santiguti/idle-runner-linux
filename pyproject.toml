@@ -1,7 +1,7 @@
 [project]
 name = "idle-runner-linux"
 version = "0.1.0"
-description = "Linux port of Devil4ngle's Idle Runner, a pixel-based Idle Slayer bot"
+description = "A pixel-based Idle Slayer bot for Linux"
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.0",

@@ -45,6 +45,18 @@ def test_out_of_range_is_an_error(tmp_path) -> None:
         load_settings(write(tmp_path, "[general]\njump_interval_ms = 301\n"))
 
 
+def test_ascend_percent_needs_bonus_samples(tmp_path) -> None:
+    with pytest.raises(ValueError, match="auto_ascend_percent needs ascend_bonus_sample_minutes > 0"):
+        load_settings(write(tmp_path, "[general]\nauto_ascend_percent = 10\n"))
+    s = load_settings(write(tmp_path, "[general]\nauto_ascend_percent = 10\nascend_bonus_sample_minutes = 1\n"))
+    assert s.auto_ascend_percent == 10
+
+
+def test_tree_buying_is_off_by_default(tmp_path) -> None:
+    assert load_settings(write(tmp_path, "")).auto_buy_tree is False
+    assert load_settings(write(tmp_path, "[general]\nauto_buy_tree = true\n")).auto_buy_tree is True
+
+
 def test_example_config_documents_the_defaults() -> None:
     assert load_settings(EXAMPLE) == Settings()
 
