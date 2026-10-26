@@ -116,32 +116,52 @@ def nodes_clicked(fake) -> list[str]:
     return [names[c] for c in fake.clicks() if c in names]
 
 
-def test_buys_in_order_skips_bought_nodes_and_stops_at_a_locked_one(game, fake, events) -> None:
-    tree = FakeTree(fake, bought={"Village Key"}, locked={"Blessing of Cronus"})
+def name(i: int) -> str:
+    return ORDER[i][0]
+
+
+def test_buys_in_order_skips_bought_and_locked_nodes_and_stops_without_enough_sp(game, fake, events) -> None:
+    # The wiki's order doesn't follow the tree's links: a node locked by a later prerequisite is skipped.
+    tree = FakeTree(fake, bought={name(0)}, locked={name(2)}, poor={name(4)})
     Tree(game).buy()
 
-    assert tree.bought == {"Village Key", "Idle Earrings I", "Idle Earrings II"}
-    assert [r["node"] for r in events() if r["event"] == "Tree node bought"] == ["Idle Earrings I", "Idle Earrings II"]
-    assert "Portals" not in nodes_clicked(fake)
+    assert tree.bought == {name(0), name(1), name(3)}
+    assert [r["node"] for r in events() if r["event"] == "Tree node bought"] == [name(1), name(3)]
+    assert name(5) not in nodes_clicked(fake)  # stopped at name(4): wait for SP, in the wiki's order
     assert fake.clicks()[-1] == (570, 694)  # the panel is closed again
 
 
+def test_a_locked_node_is_checked_again_only_after_a_purchase(game, fake) -> None:
+    tree_ui = FakeTree(fake, locked={name(0)}, poor={name(1)})
+    tree = Tree(game)
+    tree.buy()
+    fake.actions.clear()
+    tree.buy()  # nothing bought since: name(0) is still locked
+    assert nodes_clicked(fake) == [name(1)]
+
+    tree_ui.poor.clear()
+    tree.buy()  # buys name(1), which may have unlocked name(0)
+    fake.actions.clear()
+    tree.buy()
+    assert nodes_clicked(fake)[0] == name(0)
+
+
 def test_zooms_all_the_way_out_before_clicking_a_node(game, fake) -> None:
-    FakeTree(fake, locked={"Village Key"})
+    FakeTree(fake, locked={name(0)})
     Tree(game).buy()
 
     wheel_downs = [i for i, a in enumerate(fake.actions) if a == ("button", 5, True)]
-    first_node = next(i for i, a in enumerate(fake.actions) if a == ("click", 118 - 8, 213 - 31))
+    first_node = next(i for i, a in enumerate(fake.actions) if a == ("click", ORDER[0][1][0] - 8, ORDER[0][1][1] - 31))
     assert len(wheel_downs) == 20 and wheel_downs[-1] < first_node
 
 
-def test_never_opens_a_node_whose_tooltip_shows_the_cost_in_red(game, fake, events) -> None:
+def test_never_buys_a_node_whose_tooltip_shows_the_cost_in_red(game, fake, events) -> None:
     # Buy without enough SP offers to pay the difference with jewels, bought with real money (2026-10-26).
-    tree = FakeTree(fake, poor={"Village Key"})
+    tree = FakeTree(fake, poor={name(0)})
     Tree(game).buy()
 
     assert (534, 582) not in fake.clicks()
-    assert nodes_clicked(fake) == []
+    assert nodes_clicked(fake) == [name(0)]  # opened only to see it isn't locked, then closed
     assert [r["reason"] for r in events() if r["event"] == "Tree stopped"] == ["not enough SP"]
     assert not tree.box_ticked
 
@@ -157,7 +177,7 @@ def test_never_clicks_buy_without_seeing_the_cost_in_green(game, fake, events) -
 
 
 def test_closes_a_jewel_offer_at_once_and_never_ticks_its_box(game, fake, event_names) -> None:
-    tree = FakeTree(fake, poor={"Village Key"}, lying_tooltips=True)
+    tree = FakeTree(fake, poor={name(0)}, lying_tooltips=True)
     Tree(game).buy()
 
     assert "Tree jewel offer closed" in event_names()
@@ -168,22 +188,22 @@ def test_closes_a_jewel_offer_at_once_and_never_ticks_its_box(game, fake, event_
 
 def test_a_bought_node_is_recognised_from_its_tooltip_without_opening_it(game, fake) -> None:
     # After a restart the bot checked every bought node by hovering 1.5 s and opening it (2026-10-26).
-    FakeTree(fake, bought={"Village Key", "Idle Earrings I"}, locked={"Idle Earrings II"})
+    FakeTree(fake, bought={name(0), name(1)}, poor={name(2)})
     start = fake.t
     Tree(game).buy()
 
-    assert nodes_clicked(fake) == ["Idle Earrings II"]
+    assert nodes_clicked(fake) == [name(2)]  # opened only to see it isn't locked
     assert fake.t - start < 5_000
 
 
-def test_bought_nodes_are_not_clicked_again_in_the_next_run(game, fake) -> None:
-    FakeTree(fake, bought={"Village Key"}, locked={"Idle Earrings I"})
+def test_bought_nodes_are_not_checked_again_in_the_next_run(game, fake) -> None:
+    FakeTree(fake, bought={name(0)}, poor={name(1)})
     tree = Tree(game)
     tree.buy()
     fake.actions.clear()
     tree.buy()
 
-    assert nodes_clicked(fake) == ["Idle Earrings I"]
+    assert [a for a in fake.actions if a[0] == "move" and (a[1] + 8, a[2] + 31) == ORDER[0][1]] == []
 
 
 def test_nothing_is_clicked_in_the_tree_when_its_tab_does_not_show(game, fake, event_names) -> None:

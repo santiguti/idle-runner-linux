@@ -6,6 +6,10 @@ Clicking a node ("Buy on Click" off) opens a modal whose pixel at (468, 571) tel
 (the prerequisites are met, not necessarily the SP), red = one wide button, "Can't buy yet" (a
 prerequisite is missing) or "Close" (bought); the wider text tells them apart.
 
+The order is the wiki's, which doesn't follow the tree's links: a node whose prerequisite comes later is
+skipped until a purchase may have unlocked it. A node that can be bought but costs more SP than there is
+stops the routine, so SP is saved in the wiki's order.
+
 **Buy without enough SP offers to pay the difference with jewels**, bought with real money (2026-10-26).
 So Buy is clicked only after the node's tooltip showed its cost in green (enough SP), and that offer is
 closed at once if it shows anyway. Its jewel button needs its "I understand" box ticked first; nothing in
@@ -17,25 +21,119 @@ from idle_runner.actions import PANEL_X_RED, TAB_SELECTED, open_ascension_tab
 from idle_runner.game import Game
 from idle_runner.log import event
 
-# The user's order (2026-10-26): the wiki's Ultra Ascension guide (the way to Blessing of Cronus and souls
-# first, CpS later) plus Portals and Portal Traveler, needed for jellies. A node's prerequisites come
-# before it: the routine stops at the first node it can't buy. Points are node centres at minimum zoom.
+# The wiki's order (user's request, 2026-10-26: "respetemos lo que diga la wiki"), as surveyed in the game
+# on 2026-10-26: every point was clicked and its modal's name read. Points are node centres at minimum zoom,
+# in AutoIt coordinates; costs as the game shows them.
 ORDER: list[tuple[str, tuple[int, int]]] = [
-    ("Village Key", (118, 213)),
-    ("Idle Earrings I", (148, 273)),
-    ("Idle Earrings II", (148, 303)),
-    ("Blessing of Cronus", (118, 303)),
-    ("Portals", (248, 153)),
-    ("Green Ore", (308, 248)),
-    ("Pink Ore", (338, 248)),
-    ("Soul Gem", (368, 248)),
-    ("Portal Traveler", (278, 153)),
-    ("Legendary Belt", (248, 333)),
-    ("Sacred Book of Projectiles", (308, 333)),  # the Bow
-    ("Dangerous While Alone", (118, 243)),
-    ("Orange Ore", (268, 228)),
-    ("Yellow Ore", (348, 228)),
-    ("Money Laundering", (178, 153)),
+    # 1. What's left of the wiki's Ultra Ascension guide: Portal Traveler (jellies), the way to the Bow,
+    #    then Stability and Triple Shot (Ancient Quests and Hot Desert come first there, but sit under the
+    #    header at minimum zoom: not located yet).
+    ('Portal Traveler', (278, 152)),  # 200
+    ('Legendary Belt', (248, 333)),  # 350
+    ('Sacred Book of Projectiles', (308, 333)),  # 1,000
+    ('Stability', (337, 333)),  # 3,000
+    ('Triple Shot', (337, 362)),  # 4,000
+    # 2. The cheap nodes the tier list's "First Ultra Ascension" section lists right after Blessing of Cronus.
+    ('Orange Ore', (267, 227)),  # 5
+    ('Yellow Ore', (348, 227)),  # 5
+    ('Dangerous While Alone', (118, 242)),  # 35
+    # 3. The tier list, tiers 1-10 in the wiki's order (Bullet Time and Map: not located yet).
+    ("Doesn't Matter to Me", (307, 303)),  # 150
+    ('Soul Slash', (247, 363)),  # 450
+    ('Axe Edge', (247, 393)),  # 600
+    ('Minions', (250, 423)),  # 1,200
+    ('Money Laundering', (178, 152)),  # 25
+    ('Purple Ore', (278, 249)),  # 40
+    ('Cheap Darkness', (308, 217)),  # 30
+    ('Dagger Edge', (178, 303)),  # 75
+    ('Stocks Buyer', (207, 151)),  # 50
+    ('Every Day Counts', (308, 274)),  # 50
+    ('Idle Earrings III', (147, 332)),  # 100
+    ('Idle Earrings IV', (178, 333)),  # 250
+    ('Idle Earrings of Death', (207, 333)),  # 250
+    ('Bring Hell', (338, 303)),  # 600
+    ('Mystic Valley', (277, 363)),  # 1,200
+    ('Enchanted Arrows', (308, 363)),  # 600
+    ('Dark Wand', (248, 452)),  # 2,000
+    ('Dark Wizard', (276, 454)),  # 2,500
+    ('Ethereal Wand', (219, 452)),  # 500
+    ('Dual Randomness', (218, 393)),  # 300
+    ('Coins In The Box', (217, 422)),  # 350
+    ('Royalties', (217, 362)),  # 400
+    ('Lunar Idle Earrings', (189, 366)),  # 950
+    ('Solar Idle Earrings', (187, 392)),  # 1,000
+    ('Book of Efficiency I', (119, 441)),  # 500
+    ('Silver Money Amulet', (278, 393)),  # 1,600
+    ('Golden Money Amulet', (308, 393)),  # 2,000
+    ('Soul Reaper II', (307, 421)),  # 1,000
+    ('Soul Amulet', (338, 393)),  # 3,000
+    ('Rock And Stone', (248, 523)),  # 10,000
+    ('Embrace The Fear', (337, 421)),  # 6,500
+    ('Skeleton', (338, 453)),  # 8,000
+    ('Safety First', (148, 363)),  # 8,000
+    ('Chest Hunt Saver', (118, 333)),  # 5,000
+    ('Sword Edge II', (147, 393)),  # 1,850
+    ('Shinies', (118, 393)),  # 500
+    ('Golden Invasion', (88, 392)),  # 650
+    ('Saved', (368, 322)),  # 2,500
+    ('Book of Efficiency II', (120, 473)),  # 5,000
+    ('Bonus Stage 2', (367, 485)),  # 5,000
+    ('Doomed', (368, 283)),  # 2,500
+    ('Permanent Supply Boxes', (188, 422)),  # 4,000
+    ('King of The Sea', (367, 207)),  # 6,500
+    ('ASHPD', (307, 152)),  # 5,000
+    ('Wall Breaker', (276, 421)),  # 3,500
+    ('Tornado of Souls', (398, 207)),  # 20,000
+    ('Gemstone Rush', (398, 303)),  # 10,000
+    ('Bag', (430, 333)),  # 10,000
+    ('Terra Idle Earrings', (148, 443)),  # 7,500
+    ('Roll The Dice', (398, 173)),  # 16,500
+    ('Premium Time', (368, 173)),  # 25,000
+    ('Knight Services', (247, 481)),  # 7,500
+    ('High Alchemy', (306, 452)),  # 12,000
+    ('Blue Sparkle', (398, 248)),  # 6,000
+    ('Factory', (367, 392)),  # 140,000
+    ('Human After All', (368, 423)),  # 60,000
+    ('Protect', (398, 513)),  # 15,000
+    ('Oblivion Idle Earrings', (168, 463)),  # 23,000
+    ('Boost Blood', (447, 207)),  # 50,000
+    ('Augmented Boost Kill', (447, 234)),  # 100,000
+    ('Super Chest Souls', (477, 208)),  # 35,000
+    ('Soul Silver', (392, 146)),  # 35,000
+    ('Muscle Memory', (367, 362)),  # 35,000
+    ('Book of Efficiency III', (118, 503)),  # 50,000
+    ('Idle Earrings of Unity', (148, 483)),  # 45,000
+    ('Mega Horde', (437, 303)),  # 175,000
+    ('Blessing of Kratos', (397, 352)),  # 95,000
+    ('Divinities', (398, 393)),  # 200,000
+    ('Critical Culling', (207, 526)),  # 150,000
+    ('Bonus Rewards+', (427, 172)),  # 1,250,000
+    ('Mega Chest Souls', (428, 143)),  # 1,500,000
+    ('Book of Efficiency IV', (119, 529)),  # 500,000
+    # 4. The rest of the "First Ultra Ascension" section, in its order; the Ultra Ascension node last (it
+    #    brings the Ultra Ascend button back, which the bot never clicks).
+    ('Inner Power', (276, 524)),  # 5,000
+    ('3 Rows', (457, 173)),  # 350,000
+    ('Critical Training', (178, 493)),  # 350,000
+    ('Critical Practice', (178, 553)),  # 350,000
+    ('Critical Study', (178, 523)),  # 350,000
+    ('Perfect Prestige', (466, 422)),  # 2,500,000
+    ('Rage Mode', (210, 564)),  # 30,000,000
+    ('Already Enraged', (238, 563)),  # 100
+    ('Outrage', (268, 563)),  # 200
+    ('Fury', (237, 592)),  # 10
+    ("Gala's Bone", (338, 491)),  # 600,000
+    ('Climbing Boots', (368, 513)),  # 75,000
+    ('Book of Efficiency V', (148, 533)),  # 5,000,000
+    ('Giant Horde', (497, 332)),  # 50,000,000
+    ('Careful Slayer', (457, 333)),  # 12,500,000
+    ('Master Chest Souls', (118, 363)),  # 150 M
+    ('Advanced Cooking', (448, 272)),  # 2,000,000
+    ('Ramen', (477, 242)),  # 3,500,000
+    ('Stew', (477, 302)),  # 4,000,000
+    ('Bonus Sphere Control', (367, 542)),  # 5,000,000
+    ('Astral Slayer', (507, 271)),  # 500 M
+    ('Ultra Ascension', (450, 392)),  # 2,000,000
 ]
 MODAL_STATE = (468, 571)
 BUY_GREEN = 0x00A400
@@ -56,12 +154,14 @@ class Tree:
         # Nodes seen bought during this run of the bot, so they aren't clicked again. An Ultra Ascension by
         # hand while the bot runs makes this stale: restart the bot after one.
         self.bought: set[str] = set()
+        # Nodes seen locked ("Can't buy yet") since the last purchase: only a purchase unlocks a node.
+        self.locked: set[str] = set()
 
     def buy(self) -> None:
         g = self.game
         if self.open_tree():
             for name, point in ORDER:
-                if name not in self.bought and not self.buy_node(name, point):
+                if name not in self.bought | self.locked and not self.buy_node(name, point):
                     break
         g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
 
@@ -88,18 +188,20 @@ class Tree:
         if tooltip == "unlocked":
             self.bought.add(name)
             return True
-        if tooltip == "not enough":
-            event("Tree stopped", node=name, reason="not enough SP")
-            return False
         state = self.open_modal(point)
         if state == "bought":
             self.bought.add(name)
             return self.close_modal(648, 582)  # its wide "Close" button
+        if state == "locked":  # a prerequisite comes later in the wiki's order: go on
+            self.locked.add(name)
+            return self.close_modal(648, 582)  # "Can't buy yet"
         if state != "buy":
-            event("Tree stopped", node=name, reason=state or "no modal")
+            event("Tree stopped", node=name, reason="no modal")
             g.save_frame("tree-stopped")
-            if state:
-                self.close_modal(648, 582)  # "Can't buy yet"
+            return False
+        if tooltip == "not enough":  # wait for the SP, in the wiki's order
+            event("Tree stopped", node=name, reason="not enough SP")
+            self.close_modal(758, 582)  # Close
             return False
         if tooltip != "enough":  # the tooltip's cost wasn't read: never Buy blind
             event("Tree stopped", node=name, reason="cost not read")
@@ -111,6 +213,7 @@ class Tree:
             return False
         if self.wait_modal_gone() and self.open_modal(point) == "bought":  # check it took
             self.bought.add(name)
+            self.locked.clear()  # it may have unlocked nodes earlier in the order
             event("Tree node bought", node=name)
             return self.close_modal(648, 582)
         event("Tree node not bought", node=name)  # not enough SP, most likely

@@ -1,6 +1,6 @@
 # Next steps (handoff of 2026-10-22)
 
-211 tests pass (`.venv/bin/python -m pytest -q`; 2026-10-26). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
+212 tests pass (`.venv/bin/python -m pytest -q`; 2026-10-26). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
 
 ## Log review of 2026-10-25 (last run: 2026-10-23 19:15 – 10-24 00:14, about 5 h)
 
@@ -121,6 +121,24 @@
       - Checked on 26 recorded tooltips: 16 costs read right, 10 "Unlocked" never read as affordable.
       - Red → stop without opening the modal. Not read → close the modal with Close and stop. A jewel
         offer anyway → its Close, stop.
+  - **Full wiki order (2026-10-26, user: "respetemos lo que diga la wiki"):** `ORDER` holds 102 nodes.
+    - The survey clicked 155 candidate points at minimum zoom and read each modal's name: no misses, no
+      duplicates. Candidates came from a colour disc detector plus 23 points added by eye.
+      - Recipe: the panel's background is saturated orange-brown (hue 10-50°, sat > 0.45). Score each point
+        as non-background share within r 11 × background share within r 14-17, and take local maxima.
+      - Static-pixel and edge-circle detectors failed: the panel is translucent and the rings pulse.
+      - Scripts and the name → position map are in the session's scratchpad (`map/`). Re-survey with
+        them if the tree changes.
+    - Order: what's left of the UA guide (Portal Traveler, Legendary Belt, the Bow, Stability, Triple
+      Shot), the cheap "First Ultra Ascension" nodes (Orange Ore, Yellow Ore, Dangerous While Alone), the
+      tier list's tiers 1-10 in order, the rest of the "First Ultra Ascension" section, and the Ultra
+      Ascension node last.
+    - New rule: a node locked by a prerequisite ("Can't buy yet") is skipped and checked again after the
+      next purchase, since the wiki's order doesn't follow the tree's links. A buyable node with the cost in
+      red stops the run (SP is saved in order).
+    - Not located (under the header at minimum zoom, or missed): Ancient Quests 5, Hot Desert 5, Bullet
+      Time 250, Map 150, Portal Dominum, Land Lord, Astral Sword, Astral Blessing, Daily Silver Bonus.
+    - Cost: after each purchase the locked nodes before the stop point are opened again, ~1.2 s each.
   - **`collect_minions` guarded (2026-10-26):**
     - After the UA its trigger still fired (00:08:38, 01:04:39) with no Minions tab.
     - Its claim clicks (318, 182) ×5 and (320, 280) ×5 then landed in the tree and opened modals; with
