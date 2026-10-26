@@ -166,6 +166,16 @@ def test_closes_a_jewel_offer_at_once_and_never_ticks_its_box(game, fake, event_
     assert not tree.box_ticked and tree.bought == set()
 
 
+def test_a_bought_node_is_recognised_from_its_tooltip_without_opening_it(game, fake) -> None:
+    # After a restart the bot checked every bought node by hovering 1.5 s and opening it (2026-10-26).
+    FakeTree(fake, bought={"Village Key", "Idle Earrings I"}, locked={"Idle Earrings II"})
+    start = fake.t
+    Tree(game).buy()
+
+    assert nodes_clicked(fake) == ["Idle Earrings II"]
+    assert fake.t - start < 5_000
+
+
 def test_bought_nodes_are_not_clicked_again_in_the_next_run(game, fake) -> None:
     FakeTree(fake, bought={"Village Key"}, locked={"Idle Earrings I"})
     tree = Tree(game)

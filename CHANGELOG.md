@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.2 (2026-10-26)
+
+### Fixed
+- **Slow check of nodes already bought.** After each restart the bot went over every bought node: it hovered over each one for 1.5 seconds and opened it. It now recognises "Unlocked" in the tooltip and moves on in under a second, without opening the node. Checked on 34 recorded tooltips, all read right.
+
 ## v1.1.1 (2026-10-26)
 
 A safety fix for Ascension Tree buying, which is now seen working live.

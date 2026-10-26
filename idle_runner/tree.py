@@ -41,9 +41,9 @@ MODAL_STATE = (468, 571)
 BUY_GREEN = 0x00A400
 MODAL_RED = 0xAF0000
 JEWEL_BUTTON = 0x094309  # at MODAL_STATE in the jewel offer; its box at (583, 521) is white (2026-10-26)
-# A node's tooltip (measured 2026-10-25 on 26 tooltips): a 262626 box from x + 43, centred on the pointer.
-# Its cost line ends with the SP icon (6A31CA) and the digits are 11AA23 with enough SP, AD1111 without.
-# "Unlocked" is 11AA23 too, but never on a row with the SP icon.
+# A node's tooltip (measured 2026-10-25/26 on 34 tooltips, all read right): a 262626 box from x + 43,
+# centred on the pointer, up to ±122 px tall. Its cost line ends with the SP icon (6A31CA) and the digits
+# are 11AA23 with enough SP, AD1111 without. A bought node's says "Unlocked", 11AA23 on a row without it.
 TOOLTIP_BG = (0x26, 0x26, 0x26)
 SP_ICON = (0x6A, 0x31, 0xCA)
 COST_GREEN = (0x11, 0xAA, 0x23)
@@ -84,8 +84,11 @@ class Tree:
     def buy_node(self, name: str, point: tuple[int, int]) -> bool:
         """Buy one node if it isn't bought yet. False when the routine must stop here."""
         g = self.game
-        affordable = self.cost_affordable(point)
-        if affordable is False:
+        tooltip = self.tooltip(point)
+        if tooltip == "unlocked":
+            self.bought.add(name)
+            return True
+        if tooltip == "not enough":
             event("Tree stopped", node=name, reason="not enough SP")
             return False
         state = self.open_modal(point)
@@ -98,7 +101,7 @@ class Tree:
             if state:
                 self.close_modal(648, 582)  # "Can't buy yet"
             return False
-        if not affordable:  # the tooltip's cost wasn't read: never Buy blind
+        if tooltip != "enough":  # the tooltip's cost wasn't read: never Buy blind
             event("Tree stopped", node=name, reason="cost not read")
             g.save_frame("tree-cost-not-read")
             self.close_modal(758, 582)  # Close
@@ -119,26 +122,39 @@ class Tree:
             self.close_modal(648, 582)
         return False
 
-    def cost_affordable(self, point: tuple[int, int]) -> bool | None:
-        """Hover the node and read its tooltip's cost: True in green, False in red, None if no cost line
-        shows within 1.5 s (no tooltip, or "Unlocked")."""
+    def tooltip(self, point: tuple[int, int]) -> str | None:
+        """Hover the node and read its tooltip: "enough" (cost in green), "not enough" (in red), "unlocked"
+        (bought), or None if none of them shows within 1.5 s. Two equal reads 100 ms apart (it fades in)."""
         g = self.game
         x, y = point
         g.move(x, y)
         g.sleep(200)  # the previous node's tooltip goes; this one needs ~0.5 s of hovering
         deadline = g.now() + 1500
         while g.now() <= deadline:
-            region = g.grab(x + 43, y - 90, min(x + 343, 647), y + 90)  # x 647: the panel's right edge
-            background = (region == TOOLTIP_BG).all(axis=2)
-            if background.any():
-                ys, xs = np.nonzero(background)
-                box = region[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
-                cost_line = box[(box == SP_ICON).all(axis=2).any(axis=1)]
-                if (cost_line == COST_GREEN).all(axis=2).any():
-                    return True
-                if (cost_line == COST_RED).all(axis=2).any():
-                    return False
+            state = self.read_tooltip(x, y)
+            if state:
+                g.sleep(100)
+                if self.read_tooltip(x, y) == state:
+                    return state
             g.sleep(50)
+        return None
+
+    def read_tooltip(self, x: int, y: int) -> str | None:
+        # x 647, y 31 and 750: the panel's right edge and the client area's top and bottom
+        region = self.game.grab(x + 43, max(y - 170, 31), min(x + 343, 647), min(y + 170, 750))
+        background = (region == TOOLTIP_BG).all(axis=2)
+        if not background.any():
+            return None
+        ys, xs = np.nonzero(background)
+        box = region[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+        icon_rows = (box == SP_ICON).all(axis=2).any(axis=1)
+        green_rows = (box == COST_GREEN).all(axis=2).any(axis=1)
+        if (green_rows & icon_rows).any():
+            return "enough"
+        if ((box == COST_RED).all(axis=2).any(axis=1) & icon_rows).any():
+            return "not enough"
+        if (green_rows & ~icon_rows).any():
+            return "unlocked"
         return None
 
     def jewel_offer_closed(self, name: str) -> bool:
