@@ -3,4 +3,4 @@
 __version__ = "1.5.0"
 REPO = "santiguti/idle-slayer-bot"
 # Where the window's "Support Idle Runner" button leads (e.g. a Ko-fi page). Empty: no button.
-DONATE_URL = ""
+DONATE_URL = "https://ko-fi.com/santiguti"

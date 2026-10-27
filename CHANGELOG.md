@@ -5,6 +5,7 @@
 ### New
 - **Tree nodes under the header.** At the tree's minimum zoom the header covers the top rows, so the bot couldn't reach them. It now zooms in and moves to the top of the tree for those nodes, a view that is also always the same. Ancient Quests and Hot Desert are back at the head of the recommended order, and Bullet Time is in it.
 - **50 more tree nodes the bot knows** (surveyed in the game), from Magic Beetle Box to Portal Dominum, with their costs. They aren't in the recommended order, but you can add any of them on the Tree order page. Still not located: Map, Land Lord, Astral Sword, Astral Blessing and Daily Silver Bonus.
+- Added ko_fi link
 
 ### Fixed
 - **No clicks over another window.** If a notification or an overlay sits over the game where the bot is about to click, scroll or drag, it doesn't press the button: it pauses that action like a focus loss and keeps the moment in the black box.
