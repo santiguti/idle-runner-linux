@@ -19,7 +19,7 @@ def pkg(tmp_path: Path) -> Path:
     folder = tmp_path / "pkg dir"
     (folder / ICON).parent.mkdir(parents=True)
     (folder / ICON).write_bytes(b"png")
-    (folder / "IdleRunner").write_text("#!/bin/sh\n")
+    (folder / "IdleRunner").write_text("#!/bin/sh\n", encoding="utf-8")
     (folder / "IdleRunner").chmod(0o755)
     shutil.copy(ROOT / "packaging" / "install.sh", folder / "install.sh")
     return folder
@@ -32,7 +32,7 @@ def home(tmp_path: Path) -> Path:
 
 def install(pkg: Path, home: Path) -> subprocess.CompletedProcess[str]:
     env = {"HOME": str(home), "PATH": os.environ["PATH"]}
-    return subprocess.run(["bash", str(pkg / "install.sh")], env=env, capture_output=True, text=True, check=True)
+    return subprocess.run(["bash", str(pkg / "install.sh")], env=env, capture_output=True, encoding="utf-8", check=True)
 
 
 def test_it_installs_and_adds_a_menu_entry(pkg: Path, home: Path) -> None:
@@ -40,7 +40,7 @@ def test_it_installs_and_adds_a_menu_entry(pkg: Path, home: Path) -> None:
 
     dest = home / ".local/share/idle-runner"
     assert (dest / "IdleRunner").is_file() and os.access(dest / "IdleRunner", os.X_OK)
-    desktop = (home / ".local/share/applications/idle-runner.desktop").read_text()
+    desktop = (home / ".local/share/applications/idle-runner.desktop").read_text(encoding="utf-8")
     assert f'Exec="{dest}/IdleRunner"' in desktop
     assert f"Icon={dest}/{ICON}" in desktop
     for line in ("Type=Application", "Name=Idle Runner", "Terminal=false", "Categories=Game;"):
@@ -51,11 +51,11 @@ def test_it_installs_and_adds_a_menu_entry(pkg: Path, home: Path) -> None:
 def test_reinstalling_keeps_the_config_and_logs(pkg: Path, home: Path) -> None:
     install(pkg, home)
     dest = home / ".local/share/idle-runner"
-    (dest / "config.toml").write_text("mine")
+    (dest / "config.toml").write_text("mine", encoding="utf-8")
     (dest / "logs").mkdir()
-    (dest / "logs/events.jsonl").write_text("x")
+    (dest / "logs/events.jsonl").write_text("x", encoding="utf-8")
 
     install(pkg, home)
 
-    assert (dest / "config.toml").read_text() == "mine"
-    assert (dest / "logs/events.jsonl").read_text() == "x"
+    assert (dest / "config.toml").read_text(encoding="utf-8") == "mine"
+    assert (dest / "logs/events.jsonl").read_text(encoding="utf-8") == "x"
