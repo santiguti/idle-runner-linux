@@ -82,7 +82,7 @@ def test_the_bot_stops_when_its_stdin_closes(monkeypatch, tmp_path) -> None:
     class FakePopen:
         def __init__(self, args, **kwargs) -> None:
             started.append((args, kwargs))
-            self.stdin = open(os.devnull, "w")
+            self.stdin = open(os.devnull, "w", encoding="utf-8")
             self.stdout = iter(["Bot started\n"])
 
         def poll(self):

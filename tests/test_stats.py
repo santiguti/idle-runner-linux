@@ -11,7 +11,7 @@ def test_summarize_counts_events_and_routine_durations(tmp_path) -> None:
         {"ts": 4, "event": "routine_end", "name": "auto_upgrade", "ms": 3000},
     ]
     path = tmp_path / "events.jsonl"
-    path.write_text("\n".join(json.dumps(r) for r in records) + "\n{broken\n")
+    path.write_text("\n".join(json.dumps(r) for r in records) + "\n{broken\n", encoding="utf-8")
 
     out = summarize(path)
 

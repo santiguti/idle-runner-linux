@@ -145,9 +145,9 @@ def prepare_frozen_process() -> None:
         return
     os.chdir(Path(sys.executable).parent)
     if sys.stdout is None:
-        sys.stdout = open(os.devnull, "w")
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
     if sys.stderr is None:
-        sys.stderr = open(os.devnull, "w")
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -21,9 +21,11 @@ jobs:
       - name: Install xvfb (the UI tests need a display)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y xvfb
+      # Any text file opened without encoding="utf-8" fails here too: Windows' default (cp1252) can't read
+      # every UTF-8 file, which broke the Windows tests once.
       - name: Tests (Linux)
         if: runner.os == 'Linux'
-        run: xvfb-run -a pytest -q
+        run: xvfb-run -a python -X warn_default_encoding -m pytest -q -W error::EncodingWarning
       - name: Tests (Windows)
         if: runner.os == 'Windows'
         run: pytest -q

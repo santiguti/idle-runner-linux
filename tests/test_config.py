@@ -11,7 +11,7 @@ EXAMPLE = Path(__file__).resolve().parents[1] / "config.example.toml"
 
 def write(tmp_path: Path, text: str) -> Path:
     path = tmp_path / "config.toml"
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8")
     return path
 
 

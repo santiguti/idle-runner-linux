@@ -45,7 +45,7 @@ def test_mark_keeps_the_last_minutes_and_logs_the_note(fake, logs, events) -> No
     box.prune()  # the black box moves on; the marked copy stays
 
     assert [p.name for p in folder.glob("*.png")] == [recent.name]
-    assert (folder / "note.txt").read_text() == "magnet bought\n"
+    assert (folder / "note.txt").read_text(encoding="utf-8") == "magnet bought\n"
     assert events()[-1] == {"ts": events()[-1]["ts"], "event": "User note", "text": "magnet bought",
                             "frames": 1, "folder": str(folder)}
 
@@ -68,11 +68,11 @@ def test_anomalies_keep_the_minute_before_and_30_s_after(fake, logs) -> None:
     [folder] = (logs / "marks").iterdir()
     assert folder.name.endswith("-stuck")
     assert sorted(p.name for p in folder.glob("*.png")) == sorted([before.name, after.name])
-    assert '"where": "buy_upgrade"' in (folder / "note.txt").read_text()
+    assert '"where": "buy_upgrade"' in (folder / "note.txt").read_text(encoding="utf-8")
 
 
 def test_every_anomaly_is_an_event_the_bot_logs() -> None:
     package = Path(__file__).resolve().parents[1] / "idle_runner"
-    source = "".join(p.read_text() for p in package.rglob("*.py") if p.name != "blackbox.py")
+    source = "".join(p.read_text(encoding="utf-8") for p in package.rglob("*.py") if p.name != "blackbox.py")
 
     assert [name for name in ANOMALIES if f'"{name}"' not in source] == []

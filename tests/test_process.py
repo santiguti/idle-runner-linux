@@ -20,7 +20,7 @@ def test_self_command_frozen(monkeypatch) -> None:
 def test_stdin_eof_stops() -> None:
     read_fd, write_fd = os.pipe()
     stopped = threading.Event()
-    stop_on_stdin_eof(os.fdopen(read_fd), stopped.set)
+    stop_on_stdin_eof(os.fdopen(read_fd, encoding="utf-8"), stopped.set)
     assert not stopped.wait(0.1)
 
     os.close(write_fd)  # the window closed the pipe (Stop), or died

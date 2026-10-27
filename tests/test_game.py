@@ -140,7 +140,7 @@ def test_inputs_are_logged_to_the_file(game, logs) -> None:
     for handler in log.handlers:
         handler.flush()
 
-    text = (logs / "idle_runner.log").read_text()
+    text = (logs / "idle_runner.log").read_text(encoding="utf-8")
     assert "INFO    [MainThread] click (1180,170) x1" in text
     assert "INFO    [MainThread] move (1254,172)" in text
     assert "INFO    [MainThread] wheel down x2" in text

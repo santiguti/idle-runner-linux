@@ -8,7 +8,7 @@ from idle_runner.ui.activity import EventTail, Session, apply, describe
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "events" / "2026-10-26.jsonl"
 # Three real runs of the bot on 2026-10-26: lines 0-11 (02:03, one ascension, stopped), 12-23 (02:10, tree
 # buys, stopped) and 24-42 (18:44, an ascension with a jewel offer, a bonus stage, still running).
-RECORDS = [json.loads(line) for line in FIXTURE.read_text().splitlines()]
+RECORDS = [json.loads(line) for line in FIXTURE.read_text(encoding="utf-8").splitlines()]
 
 
 def replay(records: list[dict]) -> Session:
@@ -129,10 +129,10 @@ def test_tail_reads_only_new_lines(tmp_path: Path) -> None:
     path = tmp_path / "events.jsonl"
     tail = EventTail(path)
     assert tail.read_new() == []  # no file yet
-    path.write_text('{"event": "a"}\n')
+    path.write_text('{"event": "a"}\n', encoding="utf-8")
     assert tail.read_new() == [{"event": "a"}]
     assert tail.read_new() == []
-    with path.open("a") as f:
+    with path.open("a", encoding="utf-8") as f:
         f.write('{"event": "b"}\n{"event": "c"}\n')
     assert [r["event"] for r in tail.read_new()] == ["b", "c"]
 
@@ -140,10 +140,10 @@ def test_tail_reads_only_new_lines(tmp_path: Path) -> None:
 def test_tail_waits_for_the_end_of_a_partial_line(tmp_path: Path) -> None:
     path = tmp_path / "events.jsonl"
     tail = EventTail(path)
-    with path.open("a") as f:
+    with path.open("a", encoding="utf-8") as f:
         f.write('{"event": "a"}\n{"event": "b')
     assert [r["event"] for r in tail.read_new()] == ["a"]
-    with path.open("a") as f:
+    with path.open("a", encoding="utf-8") as f:
         f.write('"}\n')
     assert tail.read_new() == [{"event": "b"}]
     assert tail.read_new() == []
@@ -151,14 +151,14 @@ def test_tail_waits_for_the_end_of_a_partial_line(tmp_path: Path) -> None:
 
 def test_tail_starts_over_after_truncation(tmp_path: Path) -> None:
     path = tmp_path / "events.jsonl"
-    path.write_text('{"event": "old one"}\n{"event": "old two"}\n')
+    path.write_text('{"event": "old one"}\n{"event": "old two"}\n', encoding="utf-8")
     tail = EventTail(path)
     tail.read_new()
-    path.write_text('{"event": "new"}\n')
+    path.write_text('{"event": "new"}\n', encoding="utf-8")
     assert tail.read_new() == [{"event": "new"}]
 
 
 def test_tail_skips_lines_that_are_not_json_objects(tmp_path: Path) -> None:
     path = tmp_path / "events.jsonl"
-    path.write_text('{"event": "a"}\nnot json\n[1, 2]\n\n{"event": "b"}\n')
+    path.write_text('{"event": "a"}\nnot json\n[1, 2]\n\n{"event": "b"}\n', encoding="utf-8")
     assert [r["event"] for r in EventTail(path).read_new()] == ["a", "b"]

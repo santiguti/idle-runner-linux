@@ -233,7 +233,7 @@ def test_wrong_window_size_pauses_input_and_warns(jumper, event_names, logs) -> 
 
     assert fake.clicks() == []
     assert "Paused: window is 1600x900, expected 1280x720" in event_names()
-    assert "WARNING" in (logs / "idle_runner.log").read_text()
+    assert "WARNING" in (logs / "idle_runner.log").read_text(encoding="utf-8")
 
 
 def test_window_resized_mid_run_pauses_the_bot(game, fake, jumper, event_names) -> None:

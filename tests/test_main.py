@@ -11,7 +11,7 @@ from tests.fakes import FakeBackend
 
 def test_invalid_config_is_reported_cleanly(tmp_path, capsys) -> None:
     config = tmp_path / "config.toml"
-    config.write_text("[general]\nbogus = 1\n")
+    config.write_text("[general]\nbogus = 1\n", encoding="utf-8")
 
     assert main_module.main(["run", "--config", str(config)]) == 1
     assert "unknown setting 'bogus'" in capsys.readouterr().err
@@ -19,7 +19,7 @@ def test_invalid_config_is_reported_cleanly(tmp_path, capsys) -> None:
 
 def test_runtime_value_errors_are_not_reported_as_config_errors(tmp_path, monkeypatch) -> None:
     config = tmp_path / "config.toml"
-    config.write_text("")
+    config.write_text("", encoding="utf-8")
     monkeypatch.chdir(tmp_path)  # logs/ is created relative to the working directory
 
     def broken_backend(name: str) -> None:
@@ -33,7 +33,7 @@ def test_runtime_value_errors_are_not_reported_as_config_errors(tmp_path, monkey
 
 def test_run_starts_and_stops_the_black_box(tmp_path, monkeypatch) -> None:
     config = tmp_path / "config.toml"
-    config.write_text("")
+    config.write_text("", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(main_module, "open_backend", lambda name: FakeBackend())
     monkeypatch.setattr(main_module, "install_stop_signals", lambda: None)
@@ -68,7 +68,7 @@ def test_run_starts_and_stops_the_black_box(tmp_path, monkeypatch) -> None:
 
 def test_run_refuses_a_second_bot(tmp_path, monkeypatch, capsys) -> None:
     config = tmp_path / "config.toml"
-    config.write_text("")
+    config.write_text("", encoding="utf-8")
     monkeypatch.setattr(main_module, "single_instance", lambda: None)
     monkeypatch.setattr(main_module, "open_backend", lambda name: pytest.fail("no backend for a second bot"))
 
@@ -82,7 +82,7 @@ def test_mark_command(tmp_path, capsys) -> None:
     assert main_module.main(["mark", "shop stuck", "--log-dir", str(log_dir)]) == 0
 
     assert "saved to" in capsys.readouterr().out
-    assert (next((log_dir / "marks").iterdir()) / "note.txt").read_text() == "shop stuck\n"
+    assert (next((log_dir / "marks").iterdir()) / "note.txt").read_text(encoding="utf-8") == "shop stuck\n"
 
 
 def test_no_command_opens_the_window(monkeypatch) -> None:
