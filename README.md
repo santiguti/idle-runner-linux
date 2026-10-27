@@ -14,6 +14,8 @@
 
 It only **looks at the game window and presses keys**, the same way you would. It never touches the game's memory, files or saves.
 
+**[⬇️ Download for Linux or Windows](https://santiguti.github.io/idle-slayer-bot/)** (or grab the files from [Releases](../../releases))
+
 <p align="center">
   <img src="docs/images/ui-dashboard.png" alt="The Idle Runner window: the bot is running, with this run's purchases, ascensions and latest events" width="80%">
 </p>
@@ -36,57 +38,12 @@ It only **looks at the game window and presses keys**, the same way you would. I
 | ⬆️ **Ascends** | Optional. On a timer, or as soon as the Ascend button's **"+X% CpS bonus"** reaches the percentage you set. |
 | 🌳 **Spends SP** | Optional. Buys Ascension Tree nodes in your order, at start and after every ascension. *New, still being tested.* |
 
-## 🛡️ Built to run unattended
-
-| | |
-|---|---|
-| 👀 **Always watching** | Checks for Megahordes, chest hunts, quests and silver boxes all the time, with no blind spots. |
-| 🎯 **Easy to control** | Plays while the game is focused. Switch windows to pause it, come back to resume. No hotkeys, no focus stealing. |
-| 🛡️ **Safe ascending** | Never clicks the **Ultra Ascend** button: it confirms on a safe spot, and only once the "Are you sure?" dialog is up. It never Ultra Ascends. |
-| ♻️ **Ultra Ascension aware** | Handles the game after an Ultra Ascension: a shop without the Quests tab, no Minions tab, a single Ascend button. |
-| 🔧 **Never gets stuck** | A screen that never shows up is logged with a screenshot and skipped. After 5 errors in a row it stops safely. |
-| 📼 **Black box** | Keeps the last hour of gameplay. Press **Mark problem** and that moment is saved for good. |
-| 📐 **Window check** | Pauses with a warning while the window isn't 1280x720. |
-| 🧪 **Automated tests** | Over 200 tests, many replaying real game screenshots. |
-
-<details>
-<summary>All the details</summary>
-
-- Focus = run, alt-tab = pause, Ctrl+C = stop. Closing the terminal or `kill` also stops it cleanly, and held keys are released (a long key hold ends as soon as the game loses focus).
-- The window size is checked continuously (e.g. if the window gets maximized).
-- An unexpected error is logged with its traceback and the bot keeps going; it stops after 5 errors in a row. Loops that could hang forever give up after a timeout and log a `stuck` event with a screenshot.
-- The jumper pauses as soon as a menu routine starts.
-- Clicks outside the game window are refused.
-- **Shop:** every tab click is checked before buying, so a click meant for one tab can't land on another (e.g. "Max" in Equipment is "Buy all available" in Upgrades). If the shop doesn't open (e.g. a minigame's results screen still covers it), it tries again 15 s later. The shop is closed only while it shows, and the bot waits for it to finish closing: a second click while it closes leaves an empty panel that blocks every later click.
-- **Quests:** blue event-quest rows are skipped while their button is the grey "Quest Reward", and bought once claimed. Without a Quests tab (after an Ultra Ascension, until quests are unlocked again) it doesn't claim, so it never opens the Jewels shop by mistake.
-- **Random Box:** if a silver or orange box shows up while shopping, the bot stops, lets the jumper grab it and buys again shortly after.
-- **After an ascension:** the coin counter is read, and the bot buys as soon as it shows 6 coins (the sword's first level), by the bot's ascension or yours. Then buying restarts at `post_ascend_first_buy_seconds` (default 15 s) and the wait doubles up to `auto_buy_minutes`.
-- **Ascend by %:** every `ascend_bonus_sample_minutes` the bot opens the Ascension tab and reads the button's "+X% CpS bonus" (SP gained by ascending ÷ SP earned so far). With `auto_ascend_percent` set, it ascends at the first reading that reaches it; `auto_ascend_minutes` stays as the cap. A bonus it can't read is logged with a screenshot, never guessed.
-- **Ascension Tree:** with `auto_buy_tree`, the bot zooms the tree all the way out (where every node has a fixed place), then clicks the nodes in the order of `tree_order` (see Settings). Bought nodes are skipped; it stops at the first node it can't buy. It runs at start, after each ascension by the bot, and after one by hand. Restart the bot after an Ultra Ascension by hand.
-- **Minions:** claimed only when the Minions tab really shows, so the claim clicks never land in the tree.
-- One-shot crafts (Dimensional/Bidimensional staff) apply once per run. The portal rotation restarts from `circle_portals_count`.
-- Bonus-stage sync markers that never show up are logged as `Sync timeout` events with a screenshot.
-- The Knight boss fight is disabled.
-
-</details>
-
 ## 🔒 Safety
 
 - It only reads pixels from the game window and sends keys and mouse clicks. It never reads or changes the game's memory, files or network traffic.
 - It never spends jewels (they cost real money): it presses Buy in the Ascension Tree only when the game shows enough Slayer Points, and closes any jewel offer.
 - It never Ultra Ascends.
 - Ascending and tree buying are off until you turn them on.
-
-## 🧠 How it works
-
-```mermaid
-flowchart LR
-    A["📸 Looks at the<br/>game window"] --> B{"🤔 What's on screen?"}
-    B -->|nothing special| C["⬆️ Keeps jumping"]
-    B -->|silver box, Megahorde,<br/>portal, minigame...| D["🖱️ Presses the keys<br/>and clicks you would"]
-    C --> A
-    D --> A
-```
 
 ## 📦 Install
 
@@ -130,7 +87,11 @@ Press **Start**, then click on the game. The bot only plays while the game windo
 <details>
 <summary>Windows</summary>
 
-The Windows version is written and tested automatically, but it hasn't been tried with the game on a real Windows PC yet. Until it has, it's a beta: run it from source in PowerShell (Python 3.12 or newer), and please [report how it goes](../../issues/new/choose).
+The Windows version is tested automatically, but it's still a beta until more people run it with the real game. Please [report how it goes](../../issues/new/choose).
+
+Download `IdleRunner-…-windows-x64.zip` from [Releases](../../releases), unzip it anywhere and double-click `IdleRunner.exe`. The exe isn't code-signed, so SmartScreen may say "Windows protected your PC": choose **More info → Run anyway**.
+
+Or run it from source in PowerShell (Python 3.12 or newer):
 
 ```powershell
 git clone https://github.com/santiguti/idle-slayer-bot.git
@@ -139,8 +100,6 @@ py -m venv .venv
 .venv\Scripts\pip install -e .
 .venv\Scripts\idle-runner
 ```
-
-From v2.0.0 on, each [release](../../releases) also has a ready-made `IdleRunner-…-windows-x64.zip`.
 
 </details>
 
@@ -166,6 +125,51 @@ Also make sure the game uses X11/XWayland: `~/.config/unity3d/Pablo Leban/Idle S
 The first time the bot presses a key, KDE Plasma on Wayland asks whether to allow it. Accept, then click on the game again.
 
 </details>
+
+## 🛡️ Built to run unattended
+
+| | |
+|---|---|
+| 👀 **Always watching** | Checks for Megahordes, chest hunts, quests and silver boxes all the time, with no blind spots. |
+| 🎯 **Easy to control** | Plays while the game is focused. Switch windows to pause it, come back to resume. No hotkeys, no focus stealing. |
+| 🛡️ **Safe ascending** | Never clicks the **Ultra Ascend** button: it confirms on a safe spot, and only once the "Are you sure?" dialog is up. It never Ultra Ascends. |
+| ♻️ **Ultra Ascension aware** | Handles the game after an Ultra Ascension: a shop without the Quests tab, no Minions tab, a single Ascend button. |
+| 🔧 **Never gets stuck** | A screen that never shows up is logged with a screenshot and skipped. After 5 errors in a row it stops safely. |
+| 📼 **Black box** | Keeps the last hour of gameplay. Press **Mark problem** and that moment is saved for good. |
+| 📐 **Window check** | Pauses with a warning while the window isn't 1280x720. |
+| 🧪 **Automated tests** | Over 200 tests, many replaying real game screenshots. |
+
+<details>
+<summary>All the details</summary>
+
+- Focus = run, alt-tab = pause, Ctrl+C = stop. Closing the terminal or `kill` also stops it cleanly, and held keys are released (a long key hold ends as soon as the game loses focus).
+- The window size is checked continuously (e.g. if the window gets maximized).
+- An unexpected error is logged with its traceback and the bot keeps going; it stops after 5 errors in a row. Loops that could hang forever give up after a timeout and log a `stuck` event with a screenshot.
+- The jumper pauses as soon as a menu routine starts.
+- Clicks outside the game window are refused.
+- **Shop:** every tab click is checked before buying, so a click meant for one tab can't land on another (e.g. "Max" in Equipment is "Buy all available" in Upgrades). If the shop doesn't open (e.g. a minigame's results screen still covers it), it tries again 15 s later. The shop is closed only while it shows, and the bot waits for it to finish closing: a second click while it closes leaves an empty panel that blocks every later click.
+- **Quests:** blue event-quest rows are skipped while their button is the grey "Quest Reward", and bought once claimed. Without a Quests tab (after an Ultra Ascension, until quests are unlocked again) it doesn't claim, so it never opens the Jewels shop by mistake.
+- **Random Box:** if a silver or orange box shows up while shopping, the bot stops, lets the jumper grab it and buys again shortly after.
+- **After an ascension:** the coin counter is read, and the bot buys as soon as it shows 6 coins (the sword's first level), by the bot's ascension or yours. Then buying restarts at `post_ascend_first_buy_seconds` (default 15 s) and the wait doubles up to `auto_buy_minutes`.
+- **Ascend by %:** every `ascend_bonus_sample_minutes` the bot opens the Ascension tab and reads the button's "+X% CpS bonus" (SP gained by ascending ÷ SP earned so far). With `auto_ascend_percent` set, it ascends at the first reading that reaches it; `auto_ascend_minutes` stays as the cap. A bonus it can't read is logged with a screenshot, never guessed.
+- **Ascension Tree:** with `auto_buy_tree`, the bot zooms the tree all the way out (where every node has a fixed place), then clicks the nodes in the order of `tree_order` (see Settings). Bought nodes are skipped; it stops at the first node it can't buy. It runs at start, after each ascension by the bot, and after one by hand. Restart the bot after an Ultra Ascension by hand.
+- **Minions:** claimed only when the Minions tab really shows, so the claim clicks never land in the tree.
+- One-shot crafts (Dimensional/Bidimensional staff) apply once per run. The portal rotation restarts from `circle_portals_count`.
+- Bonus-stage sync markers that never show up are logged as `Sync timeout` events with a screenshot.
+- The Knight boss fight is disabled.
+
+</details>
+
+## 🧠 How it works
+
+```mermaid
+flowchart LR
+    A["📸 Looks at the<br/>game window"] --> B{"🤔 What's on screen?"}
+    B -->|nothing special| C["⬆️ Keeps jumping"]
+    B -->|silver box, Megahorde,<br/>portal, minigame...| D["🖱️ Presses the keys<br/>and clicks you would"]
+    C --> A
+    D --> A
+```
 
 ## ⚙️ Settings
 
@@ -224,6 +228,10 @@ Coordinates in the code are in the original AutoIt script's frame (window includ
 - Every click, wheel notch and key hold the bot sends is in `idle_runner.log` (not on the console). The jumper's taps are only there at `log_level = "DEBUG"`.
 
 </details>
+
+## 💛 Support
+
+Idle Runner is free and always will be. If it saves you some clicks and you'd like to say thanks, you can [buy me a coffee on Ko-fi](https://ko-fi.com/santiguti). Bug reports and ideas in [Issues](../../issues) help just as much.
 
 ## 🙏 Credits
 

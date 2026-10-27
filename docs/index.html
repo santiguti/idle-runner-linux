@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idle Runner, an Idle Slayer bot</title>
+<meta name="description" content="A free, open-source Idle Slayer bot for Linux and Windows. It plays by looking at the screen and pressing keys, like you would.">
+<meta property="og:title" content="Idle Runner, an Idle Slayer bot">
+<meta property="og:description" content="Plays Idle Slayer for you on Linux and Windows. Free and open source.">
+<meta property="og:image" content="https://santiguti.github.io/idle-slayer-bot/images/banner.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Crect width='8' height='8' fill='%23f5c542'/%3E%3Crect x='2' y='2' width='4' height='4' fill='%23ffe28a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  /* The banner's palette: sky, grass, gravel, coin gold and the navy of its outlines. */
+  :root {
+    --sky-top: #1fa3e8;
+    --sky-bottom: #7fd6ff;
+    --grass: #6cc96a;
+    --gravel: #8a8f98;
+    --gravel-dark: #6d727b;
+    --gold: #f5c542;
+    --gold-light: #ffe28a;
+    --navy: #0b3954;
+    --page: #f3f9fd;
+    --text: #0b3954;
+    --muted: #3d6680;
+    --rule: #c9dfec;
+    --pixel: "Pixelify Sans", "DejaVu Sans Mono", monospace;
+    --body: "Atkinson Hyperlegible", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0a2233;
+      --text: #e3f1fa;
+      --muted: #9dbdd2;
+      --rule: #1d4560;
+    }
+  }
+  :root[data-theme="dark"] { --page: #0a2233; --text: #e3f1fa; --muted: #9dbdd2; --rule: #1d4560; }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text);
+    font: 1.0625rem/1.6 var(--body);
+  }
+  img { max-width: 100%; height: auto; display: block; }
+  a { color: inherit; text-underline-offset: 3px; }
+  :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 16px; }
+
+  /* Hero: the game's world, with the ground scrolling under it as if running. */
+  .sky {
+    position: relative;
+    background: linear-gradient(var(--sky-top), var(--sky-bottom));
+    color: var(--navy);
+    overflow: hidden;
+  }
+  .cloud { position: absolute; background: #fff; opacity: .85; }
+  .cloud::before, .cloud::after { content: ""; position: absolute; background: inherit; }
+  .cloud { width: 120px; height: 24px; }
+  .cloud::before { width: 64px; height: 20px; left: 24px; top: -20px; }
+  .cloud::after { width: 170px; height: 16px; left: -20px; top: 24px; }
+  .c1 { left: 6%; top: 60px; }
+  .c2 { right: 8%; top: 44px; transform: scale(1.15); }
+  .c3 { left: 52%; top: 26px; transform: scale(.7); }
+
+  .hero { position: relative; padding: 112px 16px 72px; max-width: 68rem; margin: 0 auto; }
+  h1 {
+    font: 700 clamp(3rem, 9vw, 6.5rem)/0.95 var(--pixel);
+    margin: 0;
+    color: #fff;
+    text-shadow: 5px 5px 0 var(--navy);
+    letter-spacing: -0.01em;
+  }
+  .lede { font-size: 1.3rem; line-height: 1.45; max-width: 34ch; margin: 20px 0 32px; font-weight: 700; }
+
+  .download { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+  .btn {
+    display: inline-block;
+    font: 700 1.35rem/1 var(--pixel);
+    color: var(--navy);
+    background: var(--gold);
+    border: 4px solid var(--navy);
+    box-shadow: 6px 6px 0 var(--navy);
+    padding: 18px 26px 16px;
+    text-decoration: none;
+    transition: transform .08s, box-shadow .08s;
+  }
+  .btn:hover { background: var(--gold-light); }
+  .btn:active { transform: translate(4px, 4px); box-shadow: 2px 2px 0 var(--navy); }
+  .alt { font-weight: 700; }
+  .fine { margin: 16px 0 0; font-size: .95rem; max-width: 52ch; }
+
+  .ground { position: relative; height: 72px; background: var(--grass); }
+  .ground::after {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 0; height: 48px;
+    background:
+      linear-gradient(var(--gravel-dark) 6px, transparent 6px),
+      repeating-linear-gradient(90deg, transparent 0 40px, var(--gravel-dark) 40px 100px, transparent 100px 200px),
+      var(--gravel);
+    background-size: 100% 100%, 400px 4px, 100% 100%;
+    background-position: 0 0, 0 22px, 0 0;
+    background-repeat: no-repeat, repeat-x, no-repeat;
+    animation: run 2.4s linear infinite;
+  }
+  @keyframes run { to { background-position: 0 0, -400px 22px, 0 0; } }
+  @media (prefers-reduced-motion: reduce) { .ground::after { animation: none; } .btn { transition: none; } }
+
+  /* The app window sits on the ground line. */
+  .shot { margin-top: -40px; position: relative; }
+  .shot img { border: 4px solid var(--navy); box-shadow: 10px 10px 0 var(--navy); width: 100%; max-width: 60rem; margin: 0 auto; }
+  .shot p { text-align: center; color: var(--muted); margin: 20px auto 0; max-width: 60ch; }
+
+  section { padding: 72px 0 0; }
+  h2 { font: 700 2.1rem/1.1 var(--pixel); margin: 0 0 24px; }
+  h3 { font: 700 1.3rem/1.2 var(--pixel); margin: 0 0 12px; }
+
+  .does { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 0 48px; margin: 0; }
+  .does div { border-top: 2px solid var(--rule); padding: 14px 0 16px; }
+  .does dt { font-weight: 700; }
+  .does dd { margin: 2px 0 0; color: var(--muted); }
+
+  .gallery { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-top: 40px; align-items: start; }
+  .gallery img { border: 3px solid var(--navy); }
+  .gallery figcaption { color: var(--muted); font-size: .95rem; margin-top: 8px; }
+  .gallery figure { margin: 0; }
+
+  /* The promises: the navy of the banner's labels, with the coin gold. */
+  .never { background: var(--navy); color: #e3f1fa; padding: 40px clamp(20px, 5vw, 56px); border-left: 8px solid var(--gold); }
+  .never h2 { color: var(--gold); }
+  .never ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+  .never li { padding-left: 28px; position: relative; max-width: 60ch; }
+  .never li::before { content: ""; position: absolute; left: 0; top: .45em; width: 12px; height: 12px; background: var(--gold); }
+
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 32px 48px; }
+  .steps ol, .steps ul { margin: 0; padding-left: 1.4em; }
+  .steps li { margin-bottom: 8px; }
+  .steps li::marker { font-family: var(--pixel); font-weight: 700; }
+  code { font: .92em/1.4 ui-monospace, "DejaVu Sans Mono", monospace; background: var(--rule); padding: 1px 5px; overflow-wrap: anywhere; }
+  .note { color: var(--muted); font-size: .95rem; margin-top: 12px; }
+
+  footer { margin-top: 88px; border-top: 2px solid var(--rule); padding: 32px 0 48px; color: var(--muted); font-size: .95rem; }
+  footer p { margin: 0 0 10px; max-width: 70ch; }
+  footer .support { color: var(--text); font-size: 1.05rem; }
+
+  @media (max-width: 40rem) {
+    .hero { padding-top: 88px; }
+    .gallery { grid-template-columns: 1fr; }
+    .shot img { box-shadow: 6px 6px 0 var(--navy); }
+  }
+</style>
+</head>
+<body>
+
+<header class="sky">
+  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+  <div class="hero">
+    <h1>Idle Runner</h1>
+    <p class="lede">Plays Idle Slayer for you on Linux and Windows, by looking at the screen and pressing keys.</p>
+    <div class="download">
+      <a class="btn" id="primary" href="https://github.com/santiguti/idle-slayer-bot/releases">Download for Linux</a>
+      <a class="alt" id="secondary" href="https://github.com/santiguti/idle-slayer-bot/releases">or for Windows (beta)</a>
+    </div>
+    <p class="fine" id="fine">Free and open source. For the Steam version of Idle Slayer.</p>
+  </div>
+  <div class="ground"></div>
+</header>
+
+<main class="wrap">
+  <div class="shot">
+    <img src="images/ui-dashboard.png" width="1060" height="700"
+         alt="The Idle Runner window while the bot runs: this run's purchases, ascensions and latest events">
+    <p>Press Start, click on the game, and leave it. Switch to another window to pause it, click the game to resume.</p>
+  </div>
+
+  <section>
+    <h2>What it does</h2>
+    <dl class="does">
+      <div><dt>Runs</dt><dd>Jumps and boosts nonstop, at the rate you choose.</dd></div>
+      <div><dt>Collects</dt><dd>Silver and orange boxes, minions and the daily bonus.</dd></div>
+      <div><dt>Buys</dt><dd>Upgrades and equipment every few minutes, and claims quest rewards.</dd></div>
+      <div><dt>Travels</dt><dd>Takes portals, cycling through the zones if you want.</dd></div>
+      <div><dt>Rages</dt><dd>Uses rage at Megahordes, optionally only with Soul Bonus.</dd></div>
+      <div><dt>Plays minigames</dt><dd>Chest hunts, bonus stages, Ascending Heights and the Victor boss fight.</dd></div>
+      <div><dt>Ascends, if you want</dt><dd>On a timer, or when the "+X% CpS bonus" reaches the percentage you set.</dd></div>
+      <div><dt>Spends SP, if you want</dt><dd>Buys Ascension Tree nodes in your order after every ascension.</dd></div>
+    </dl>
+
+    <div class="gallery">
+      <figure>
+        <img src="images/gameplay.png" width="790" height="380" alt="The bot running through the hills while a silver box appears" loading="lazy">
+        <figcaption>It watches for boxes, Megahordes and quests all the time.</figcaption>
+      </figure>
+      <figure>
+        <img src="images/ui-settings.png" width="1060" height="700" alt="The Settings page, with every option explained" loading="lazy">
+        <figcaption>Every setting is explained in plain words.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <div class="never">
+      <h2>What it never does</h2>
+      <ul>
+        <li>Read or change the game's memory, files, saves or network traffic. It only sees pixels and sends keys and clicks.</li>
+        <li>Spend jewels. They cost real money, so it closes every jewel offer.</li>
+        <li>Ultra Ascend.</li>
+        <li>Ascend or spend your Slayer Points unless you turn that on.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Get started</h2>
+    <div class="steps">
+      <div>
+        <h3>Set up the game</h3>
+        <ul>
+          <li>Windowed at <strong>1280x720</strong>, in English.</li>
+          <li>Jump on the <strong>Up arrow</strong>, boost on the <strong>Right arrow</strong>.</li>
+          <li>Custom cursor and portal dialogue off.</li>
+          <li><em>Rounded bulk</em> and <em>hide locked quest rewards</em> on.</li>
+          <li>Don't buy the Vertical Magnet.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Linux</h3>
+        <ol>
+          <li>Download the <code>linux-x64.tar.gz</code> and extract it.</li>
+          <li>Run <code>./install.sh</code> in the <code>IdleRunner</code> folder. It adds Idle Runner to your app menu.</li>
+          <li>Open Idle Runner and press Start.</li>
+        </ol>
+        <p class="note">Ubuntu 22.04, Fedora 36 or newer, with the Steam version of the game for Linux.</p>
+      </div>
+      <div>
+        <h3>Windows (beta)</h3>
+        <ol>
+          <li>Download the <code>windows-x64.zip</code> and unzip it.</li>
+          <li>Double-click <code>IdleRunner.exe</code> and press Start.</li>
+        </ol>
+        <p class="note">The app isn't code-signed, so Windows may say it protected your PC. Choose <em>More info</em>, then <em>Run anyway</em>.</p>
+      </div>
+    </div>
+    <p class="note">Something not working? <a href="https://github.com/santiguti/idle-slayer-bot#readme">The README</a> has the troubleshooting tips, and you can <a href="https://github.com/santiguti/idle-slayer-bot/issues/new/choose">report a problem</a>.</p>
+  </section>
+
+  <footer>
+    <p class="support">Idle Runner is free. If it saves you some clicks, you can <a href="https://ko-fi.com/santiguti">buy me a coffee on Ko-fi</a>.</p>
+    <p><a href="https://github.com/santiguti/idle-slayer-bot">Source code on GitHub</a>, under the MIT license. It started as a Linux port of Devil4ngle's <a href="https://github.com/Devil4ngle/Idle_Slayer_Script">Idle Runner</a> AutoIt script.</p>
+    <p>Idle Slayer is made by Pablo Leban. This project isn't affiliated with or endorsed by the game or its developer. Use it at your own risk.</p>
+  </footer>
+</main>
+
+<script>
+  // Point the buttons straight at the newest release's files. Without the API (offline, rate limit) they keep
+  // linking to the Releases page.
+  const windows = /Windows/.test(navigator.userAgent);
+  const primary = document.getElementById("primary");
+  const secondary = document.getElementById("secondary");
+  if (windows) {
+    primary.textContent = "Download for Windows (beta)";
+    secondary.textContent = "or for Linux";
+  }
+  fetch("https://api.github.com/repos/santiguti/idle-slayer-bot/releases?per_page=10")
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(releases => {
+      const release = releases.find(r => !r.draft && r.assets.length);
+      if (!release) return;
+      const asset = suffix => release.assets.find(a => a.name.endsWith(suffix));
+      const linux = asset("-linux-x64.tar.gz"), win = asset("-windows-x64.zip");
+      const [forPrimary, forSecondary] = windows ? [win, linux] : [linux, win];
+      if (forPrimary) primary.href = forPrimary.browser_download_url;
+      if (forSecondary) secondary.href = forSecondary.browser_download_url;
+      const mb = forPrimary ? `, ${Math.round(forPrimary.size / 1e6)} MB` : "";
+      document.getElementById("fine").textContent =
+        `Version ${release.tag_name.replace(/^v/, "")}${mb}. Free and open source. For the Steam version of Idle Slayer.`;
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
