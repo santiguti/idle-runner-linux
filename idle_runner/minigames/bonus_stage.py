@@ -98,25 +98,45 @@ def stage_fail(game: Game, n: int) -> bool:
     return False
 
 
-def bonus_stage(game: Game, skip: bool) -> None:
+def stage_number(game: Game) -> int:
+    """Which bonus stage the start screen ("Swipe to Start") belongs to, read before the swipe.
+
+    Bonus Stage 1 (orb goal 15 in its first section, pink sky) shows while the tree's "Bonus Stage 2" node
+    isn't bought, e.g. after an Ultra Ascension; the original only knew 2 and 3. Measured 2026-10-26: the
+    dimmed sky at (108, 114) is 1E131F in all 12 recorded BS1 starts and 060519 in all 19 BS2 starts.
+    """
+    if game.pixel_search(160, 498, 200, 498, 0x16171F) is not None:
+        return 3
+    return 1 if game.pixel_is(108, 114, 0x1E131F) else 2
+
+
+def bonus_stage(game: Game, skip: bool) -> int:
+    """Play (or skip) the bonus stage on screen; returns its number."""
     event("Start of BonusStage")
     game.sleep(200)
-    is_bs3 = game.pixel_search(160, 498, 200, 498, 0x16171F) is not None
+    stage = stage_number(game)
     game.save_frame("bonus-stage-start")
     # The original retried while (775, 448) is white, but that pixel is 141416 with the dialog up on this
     # version (2026-10-22): retry while the green handle still shows instead.
     slide_until(game, "bonus_stage", lambda: not slider_showing(game))
     if skip:
-        do_nothing(game, 3 if is_bs3 else 2)
+        do_nothing(game, stage)
+    elif stage == 1:
+        # No moves for it (the original has none): the routine ends here, so the jumper plays it and the main
+        # loop takes its Second Wind (Runner.bs1_until). With BS2's moves it failed at once and went on for
+        # ~2.5 min after the stage had ended, with the jumper paused (live, 2026-10-26).
+        event("BonusStage detected", stage=1)
+        return 1
     else:
         game.sleep(3900)
         spirit_boost = game.pixel_is(454, 91, 0xE1E0E2)
-        event("BonusStage detected", stage=3 if is_bs3 else 2, spirit_boost=spirit_boost)
-        if is_bs3:
+        event("BonusStage detected", stage=stage, spirit_boost=spirit_boost)
+        if stage == 3:
             run_bs3(game, spirit_boost)
         else:
             run_bs2(game, spirit_boost)
     game.save_frame("bonus-stage-end")
+    return stage
 
 
 def do_nothing(game: Game, n: int) -> None:

@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from idle_runner.minigames.bonus_stage import BS2_SECTIONS, bonus_stage, bs2_section, bs3_section1, run_bs2, run_bs3
+from idle_runner.minigames.bonus_stage import (BS2_SECTIONS, bonus_stage, bs2_section, bs3_section1, run_bs2, run_bs3,
+                                               stage_number)
 from idle_runner.minigames.common import slider_showing
 from tests.fakes import read_png
 
@@ -148,3 +149,38 @@ def test_one_swipe_is_enough_when_the_slider_goes(game, fake) -> None:
     bonus_stage(game, skip=True)
 
     assert fake.clicks().count((840, 560)) == 1
+
+
+@pytest.mark.parametrize(("frame", "stage"), [("start-bs1", 1), ("start-bs2", 2)])
+def test_the_stage_is_told_from_its_start_screen(game, fake, frame: str, stage: int) -> None:
+    # Bonus Stage 1 (15 orbs, pink sky) shows while the tree's "Bonus Stage 2" node isn't bought, e.g. after
+    # an Ultra Ascension. Its start screen's dimmed sky is 1E131F, BS2's 060519 (12 and 19 starts recorded).
+    fake.frame[:] = read_png(FIXTURES / f"{frame}.png")
+
+    assert stage_number(game) == stage
+
+
+def test_bonus_stage_1_is_left_to_the_jumper(game, fake, events) -> None:
+    # Played with BS2's moves it failed at once, and the routine went on for ~2.5 min after the stage had
+    # ended, holding Up in the normal run with the jumper paused (live, 2026-10-26).
+    fake.frame[:] = read_png(FIXTURES / "start-bs1.png")
+    fake.on_action = lambda a: fake.frame.fill(0) if a[0] == "click" else None  # the swipe takes
+
+    assert bonus_stage(game, skip=False) == 1
+    assert [r.get("stage") for r in events() if r["event"] == "BonusStage detected"] == [1]
+    assert not [a for a in fake.actions if a[0] == "key"]
+    assert fake.t < 2_000
+
+
+def test_skipped_bonus_stage_1_declines_second_wind(game, fake, event_names) -> None:
+    fake.frame[:] = read_png(FIXTURES / "start-bs1.png")
+
+    def fail_screen_after_the_swipe(action: tuple) -> None:
+        if action[0] == "click" and action[1:] != (716 - 8, 600 - 31):
+            fake.frame.fill(0)
+            fake.paint(615, 590, 0x00A400)  # Second Wind
+            fake.paint(716, 600, 0xAF0000)  # Close
+
+    fake.on_action = fail_screen_after_the_swipe
+    assert bonus_stage(game, skip=True) == 1
+    assert "BonusStage1 Failed" in event_names() and (560, 600) not in fake.clicks()

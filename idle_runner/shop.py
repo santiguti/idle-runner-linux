@@ -25,6 +25,9 @@ QUEST_REWARD_BLUE = 0x0B6BA1  # their background, at x = 1130
 # Their button at x = 1180: grey "Quest Reward" until the event quest's reward is claimed, then a normal
 # "Unlock" button (green 11A622 when affordable): the row stays blue but can be bought (2026-10-23).
 QUEST_REWARD_GREY = 0x7A7A7A
+# The Quests tab's icon: E03C28 at rest (639 frames recorded 2026-10-22, green always 0x3C). While something
+# can be claimed it pulses towards ED8C18 (green up to 0xA5) about once a second, selected or not.
+QUESTS_ICON = (1000, 690)
 WHEEL_PX = 50  # one wheel notch scrolls a shop list by 50 px
 # The ascension panel since the Ultra Ascension node was bought (measured 2026-10-23, client x): Ascend
 # 92-307, Ultra Ascend 332-549. The original's confirm click (550, 580) is client (542, 549), inside Ultra
@@ -98,7 +101,7 @@ class Shop:
     def __init__(self, game: Game) -> None:
         self.game = game
         # $iAutoBuyLoopAmount: caps the BuyUpgrade <-> BuyEquipment rounds at 6. The main loop
-        # resets it before each timed buy; nothing else does (known issue, see Task 13).
+        # resets it before each timed buy; nothing else does (known issue kept from the original).
         self.loop_amount = 0
         self.upgrades_bought = 0
         self.equipment_buys = 0
@@ -281,7 +284,7 @@ class Shop:
             self.loop_amount += 1
             self.buy_equipment()
         else:
-            g.click(1222, 677)  # close the shop
+            self.finish_visit()
 
     def buy_equipment(self) -> None:
         g = self.game
@@ -331,8 +334,38 @@ class Shop:
             g.save_frame("claim-no-quests-tab")
             g.click(1244, 712)  # close the shop
             return
-        if not self.select_tab("quests", 1000, 690, sleep_ms=50):
+        if not self.quests_claimable():  # the shop button's glow isn't only quests (2026-10-23)
+            event("Claim quests: nothing to claim")
             g.click(1244, 712)  # close the shop
+            return
+        self.claim_in_shop()
+        g.click(1244, 712)  # close the shop
+
+    def quests_claimable(self, watch_ms: float = 600) -> bool:
+        """The Quests tab glows: a reward can be claimed. The glow pulses about once a second and stays above
+        green 0x50 for more than half of it (measured 2026-10-22, 10 fps), so 0.6 s of watching always sees
+        it; at rest the green is 0x3C."""
+        g = self.game
+        deadline = g.now() + watch_ms
+        while True:
+            red, green, _ = (int(c) for c in g.grab(*QUESTS_ICON, *QUESTS_ICON)[0, 0])
+            if red >= 0xD0 and green >= 0x50:
+                return True
+            if g.now() > deadline:
+                return False
+            g.sleep(30)
+
+    def finish_visit(self) -> None:
+        """Close the shop after buying, claiming first if the Quests tab glows: one visit instead of two."""
+        if self.has_quests_tab() and self.quests_claimable():
+            event("Claiming quest")
+            self.claim_in_shop()
+        self.game.click(1222, 677)  # close the shop
+
+    def claim_in_shop(self) -> None:
+        """With the shop open: the Quests tab, then every green claim button in it. Leaves the shop open."""
+        g = self.game
+        if not self.select_tab("quests", 1000, 690, sleep_ms=50):
             return
         g.move(1254, 272)
         # The original checks y = 267; while the list bounces past the top, the thumb shrinks and 267
@@ -355,16 +388,22 @@ class Shop:
             else:
                 event("Quest Claimed")
                 g.click(*found)
+                # The button stays green a moment: without this wait it was clicked 2-3 times, ~21 ms apart.
+                settle = g.now() + 1000
+                while g.pixel_search(*found, *found, 0x11A622, variation=10) and g.now() < settle:
+                    g.sleep(10)
             if g.now() > deadline:
                 g.stuck("claim_quests")
                 break
         g.save_frame("claim-quests-end")
-        g.click(1244, 712)  # close the shop
 
-    def sample_ascend_bonus(self) -> float | None:
+    def sample_ascend_bonus(self, keep_open_at: float | None = None) -> float | None:
         """Open the Ascension tab, read the Ascend button's "+X% CpS bonus" and close the panel. Not in
         the original. Returns the % (0.0 for "+0"), or None when the panel didn't show or can't be read;
-        an unreadable one saves a frame, to add its glyphs to idle_runner/bonus_glyphs.py."""
+        an unreadable one saves a frame, to add its glyphs to idle_runner/bonus_glyphs.py.
+
+        A bonus of at least `keep_open_at` leaves the panel open for auto_ascend: closing it and opening it
+        again right away lost the click 4 times of 7 on 2026-10-26 ("Shop click retried", ~2 s each)."""
         g = self.game
         bonus = None
         if not open_ascension_tab(g):
@@ -375,11 +414,15 @@ class Shop:
             g.save_frame("ascend-bonus-unreadable")
         else:
             event("Ascend bonus", percent=bonus)
-        g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
+        if bonus is None or keep_open_at is None or bonus < keep_open_at:
+            g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
         return bonus
 
     def auto_ascend(self) -> bool:
-        """Ascend and run one AutoUpgrade. Returns False when it didn't ascend."""
+        """Ascend. Returns False when it didn't ascend.
+
+        The original bought right after ascending. The game shows no shop button until the first coins, so
+        that buy failed 7 times of 7 on 2026-10-26; Runner.buy_at_six_coins buys as soon as there are 6."""
         g = self.game
         if g.pixel_is(260, 600, 0x58188D):  # the ascension panel is already open
             return self._ascend("panel_open")
@@ -426,5 +469,4 @@ class Shop:
             g.click(*ASCEND_CONFIRM)
         g.sleep(300)
         event("Ascended", path=path)
-        self.auto_upgrade()
         return True

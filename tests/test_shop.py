@@ -151,6 +151,7 @@ def test_stuck_scrollbar_is_reported_instead_of_looping_forever(game, fake, even
 def test_claim_quests_clicks_green_claim_buttons(game, fake, event_names) -> None:
     fake.paint(807, 145, 0xFFFFFF)  # the shop is open
     show_tab(fake, "quests")
+    fake.paint(1000, 690, 0xED8C18)  # the Quests tab glows: something to claim
     fake.paint(1160, 300, 0x11A622)
     fake.on_action = lambda a: fake.paint(1160, 300, 0) if a == client_click(1160, 300) else None
     Shop(game).claim_quests()
@@ -184,8 +185,10 @@ def test_auto_ascend_when_the_panel_is_already_open(game, fake, event_names) -> 
     ascend_dialog_on_click(fake, 0x00A400)
 
     assert Shop(game).auto_ascend() is True
-    assert fake.clicks()[:3] == [(260, 600), (598, 581), (1163, 655)]  # the shop is closed: no X click
-    assert "Ascended" in event_names()
+    # No shop right after: its button only shows with the first coins, so that buy failed 7 of 7 times on
+    # 2026-10-26 ("AutoUpgrade shop not open"); the six-coin buy (Runner.buy_at_six_coins) makes it.
+    assert fake.clicks() == [(260, 600), (598, 581)]
+    assert "Ascended" in event_names() and "AutoUpgrade Active" not in event_names()
 
 
 def test_auto_ascend_never_clicks_ultra_ascend_when_no_dialog_shows(game, fake, events) -> None:
@@ -233,8 +236,9 @@ def test_auto_ascend_logs_and_saves_a_frame_when_the_button_is_missing(game, fak
 
 
 def test_claim_quests_saves_frames_of_what_it_saw(game, fake, events) -> None:
-    fake.paint(807, 145, 0xFFFFFF)  # the shop is open, with nothing to claim
+    fake.paint(807, 145, 0xFFFFFF)  # the shop is open; the claim isn't visible (an event quest)
     show_tab(fake, "quests")
+    fake.paint(1000, 690, 0xED8C18)  # the Quests tab glows: something to claim
     Shop(game).claim_quests()
 
     labels = [r["label"] for r in events() if r["event"] == "frame"]
@@ -384,6 +388,7 @@ def test_buy_upgrade_does_not_click_while_another_tab_shows(game, fake) -> None:
 def test_claim_quests_never_clicks_green_on_a_buying_tab(game, fake, event_names) -> None:
     fake.paint(807, 145, 0xFFFFFF)  # the shop is open...
     show_tab(fake, "upgrades")      # ...but still on Upgrades: its green buttons buy things
+    fake.paint(1000, 690, 0xED8C18)  # the Quests tab glows: something to claim
     fake.paint(1160, 300, 0x11A622)
     Shop(game).claim_quests()
 
@@ -496,6 +501,7 @@ def test_buy_upgrade_clicks_the_tab_again_when_a_click_is_lost(game, fake, event
 def test_claim_quests_stops_scrolling_up_while_the_list_bounces_at_the_top(game, fake) -> None:
     fake.paint(807, 145, 0xFFFFFF)  # shop open...
     show_tab(fake, "quests")         # ...on the Quests tab
+    fake.paint(1000, 690, 0xED8C18)  # the Quests tab glows: something to claim
     fake.paint(1254, 160, 0xB7B7B7)  # thumb at the top of the track...
     fake.paint(1254, 267, 0xA0A0A0)  # ...but shrunk by the elastic overscroll, so 267 shows the track
     notches_up = []
@@ -633,6 +639,18 @@ def test_sample_ascend_bonus_reads_and_logs_the_bonus_then_closes_the_panel(game
     assert not [r for r in events() if r["event"] == "frame"]
 
 
+@pytest.mark.parametrize(("target", "closed"), [(10, False), (15, False), (20, True)])
+def test_sample_ascend_bonus_keeps_the_panel_open_for_an_ascension(game, fake, target: float,
+                                                                   closed: bool) -> None:
+    # Closing it and opening it again right away lost the click 4 times of 7 on 2026-10-26.
+    panel = read_png(Path(__file__).parent / "fixtures" / "ascend_bonus" / "one-15.png")
+    fake.on_action = lambda a: fake.frame.__setitem__((slice(440, 600), slice(80, 450)), panel) \
+        if a == client_click(93, 680) else None
+
+    assert Shop(game).sample_ascend_bonus(keep_open_at=target) == 15.0
+    assert ((570, 694) in fake.clicks()) is closed
+
+
 def test_sample_ascend_bonus_saves_a_frame_it_cannot_read(game, fake, events) -> None:
     fake.on_action = lambda a: fake.paint(260, 480, 0x58188D) if a == client_click(93, 680) else None
 
@@ -670,3 +688,73 @@ def test_first_row_after_quest_rewards_on_recorded_frames(game, fake, name: str,
     fake.frame[115:585, 800:1270] = read_png(Path(__file__).parent / "fixtures" / "quest_rewards" / f"{name}.png")
 
     assert first_row_after_quest_rewards(game) == expected  # the fake list can't scroll: it stays put
+
+
+@pytest.mark.parametrize(("name", "claimable"), [("6-quests-gold", True), ("6-quests", False),
+                                                 ("6-upgrades", False), ("6-armor", False)])
+def test_quests_glow_on_recorded_tab_bars(game, fake, name: str, claimable: bool) -> None:
+    # The Quests tab's icon at (1000, 690): E03C28 at rest (639 recorded frames); it pulses towards
+    # ED8C18 about once a second while something can be claimed (2026-10-22).
+    paint_tab_bar(fake, name)
+
+    assert Shop(game).quests_claimable() is claimable
+
+
+def test_claim_quests_without_a_glowing_quests_tab_claims_nothing(game, fake, event_names) -> None:
+    # The shop button also glows for other things: claims ran with nothing to claim (2026-10-23).
+    fake.paint(807, 145, 0xFFFFFF)
+    show_tab(fake, "quests")
+    fake.paint(1160, 300, 0x11A622)
+    Shop(game).claim_quests()
+
+    assert "Claim quests: nothing to claim" in event_names()
+    assert (1160, 300) not in fake.clicks() and (1000, 690) not in fake.clicks()
+    assert fake.clicks()[-1] == (1244, 712)
+
+
+def test_a_buy_claims_quests_in_the_same_visit(game, fake, monkeypatch) -> None:
+    shop = Shop(game)
+    claimed = []
+    monkeypatch.setattr(shop, "claim_in_shop", lambda: claimed.append(fake.t))
+    show_tab(fake, "upgrades")
+    fake.paint(1000, 690, 0xED8C18)
+    shop.finish_visit()
+
+    assert claimed and fake.clicks()[-1] == (1222, 677)
+
+    claimed.clear()
+    fake.paint(1000, 690, 0xE03C28)  # at rest
+    shop.finish_visit()
+    assert not claimed
+
+
+def test_buy_upgrade_ends_its_visit_through_finish_visit(game, fake, monkeypatch) -> None:
+    show_tab(fake, "upgrades")
+    shop = Shop(game)
+    shop.loop_amount = 6  # no equipment round
+    finished = []
+    monkeypatch.setattr(shop, "finish_visit", lambda: finished.append(True))
+    shop.buy_upgrade()
+
+    assert finished == [True]
+
+
+def test_claim_clicks_each_button_once(game, fake) -> None:
+    # The button stays green a moment after the click: it was clicked 2-3 times, ~21 ms apart.
+    fake.paint(807, 145, 0xFFFFFF)
+    show_tab(fake, "quests")
+    fake.paint(1000, 690, 0xED8C18)
+    fake.paint(1160, 300, 0x11A622)
+    clicked_at = []
+    fake.on_action = lambda a: clicked_at.append(fake.t) if a == client_click(1160, 300) else None
+    grab = fake.grab
+
+    def button_goes_after_60_ms(x: int, y: int, w: int, h: int):
+        if clicked_at and fake.t >= clicked_at[0] + 60:
+            fake.paint(1160, 300, 0)
+        return grab(x, y, w, h)
+
+    fake.grab = button_goes_after_60_ms
+    Shop(game).claim_quests()
+
+    assert fake.clicks().count((1160, 300)) == 1

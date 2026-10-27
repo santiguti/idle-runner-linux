@@ -39,8 +39,8 @@ def test_second_run_buys_tree_nodes() -> None:
 
 def test_whole_fixture_is_the_last_run_because_bot_started_resets() -> None:
     s = replay(RECORDS)
-    # problems: "Shop tab not shown" and two "Sync timeout"; the jewel offer isn't an anomaly (yet)
-    assert counters(s) == (0, 6, 1, 21.5, 0, 1, 1, 1, 3)
+    # problems: "Shop tab not shown", two "Sync timeout" and the jewel offer (an anomaly since B2)
+    assert counters(s) == (0, 6, 1, 21.5, 0, 1, 1, 1, 4)
     assert (s.state, s.detail, s.nodes_bought) == ("running", "", set())
 
 

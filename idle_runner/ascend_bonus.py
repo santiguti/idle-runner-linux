@@ -1,7 +1,6 @@
 """Read the Ascend button's "+X% CpS bonus." while the ascension panel is open. Not in the original.
 
-The % is SP gained by ascending / SP earned so far, the wiki's measure of when to ascend (step 3 in
-docs/next-steps.md). The button's lines are SP gained, then CpS bonus (then Souls bonus before the Ultra
+The % is SP gained by ascending / SP earned so far, the wiki's measure of when to ascend. The button's lines are SP gained, then CpS bonus (then Souls bonus before the Ultra
 Ascension), in pure white; the button's twinkling stars never are (measured 2026-10-23). The game shrinks
 the font to fit the button (14-16 px tall), so glyphs are compared scaled to one size.
 """

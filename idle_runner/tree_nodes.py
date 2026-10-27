@@ -1,7 +1,7 @@
 """Every Ascension Tree node the bot knows, as data (the click points were surveyed 2026-10-26).
 
-`point` is the node's centre at the tree's minimum zoom, in AutoIt coordinates (docs/next-steps.md, "Tree
-session"); `cost` is in SP as the game shows it ("150 M" is 150_000_000). The order of `NODES` is the
+`point` is the node's centre in its layout (`layout`: the tree's minimum zoom, or Tree.show_layout's "top"), in
+AutoIt coordinates; `cost` is in SP as the game shows it ("150 M" is 150_000_000). The order of `NODES` is the
 recommended buying order, `RECOMMENDED_ORDER`: the wiki's order, which doesn't follow the tree's links.
 """
 from typing import NamedTuple
@@ -10,6 +10,9 @@ from typing import NamedTuple
 class Node(NamedTuple):
     point: tuple[int, int]
     cost: int
+    # "min": the minimum zoom. "top": 3 notches in from there and dragged to the top, where the nodes the
+    # header covers at minimum zoom show (Tree.show_layout; both are fixed layouts, surveyed 2026-10-26).
+    layout: str = "min"
 
 
 NODES: dict[str, Node] = {
@@ -24,8 +27,10 @@ NODES: dict[str, Node] = {
     "Pink Ore": Node((338, 248), 50),
     "Soul Gem": Node((368, 248), 25),
     # 1. What's left of the wiki's Ultra Ascension guide: Portal Traveler (jellies), the way to the Bow,
-    #    then Stability and Triple Shot (Ancient Quests and Hot Desert come first there, but sit under the
-    #    header at minimum zoom: not located yet).
+    #    then Stability and Triple Shot. Ancient Quests and Hot Desert come first there (under the header at
+    #    minimum zoom: bought from the "top" layout).
+    "Ancient Quests": Node((253, 173), 5, "top"),
+    "Hot Desert": Node((177, 173), 5, "top"),
     "Portal Traveler": Node((278, 152), 200),
     "Legendary Belt": Node((248, 333), 350),
     "Sacred Book of Projectiles": Node((308, 333), 1_000),
@@ -35,7 +40,9 @@ NODES: dict[str, Node] = {
     "Orange Ore": Node((267, 227), 5),
     "Yellow Ore": Node((348, 227), 5),
     "Dangerous While Alone": Node((118, 242), 35),
-    # 3. The tier list, tiers 1-10 in the wiki's order (Bullet Time and Map: not located yet).
+    # 3. The tier list, tiers 1-10 in the wiki's order (Map: not located yet; Bullet Time located 2026-10-26,
+    #    first here as the old comment listed it).
+    "Bullet Time": Node((243, 304), 250),
     "Doesn't Matter to Me": Node((307, 303), 150),
     "Soul Slash": Node((247, 363), 450),
     "Axe Edge": Node((247, 393), 600),
@@ -134,3 +141,56 @@ NODES: dict[str, Node] = {
     "Ultra Ascension": Node((450, 392), 2_000_000),
 }
 RECOMMENDED_ORDER: tuple[str, ...] = tuple(NODES)
+# Surveyed 2026-10-26 (every unknown node at minimum zoom, and the band the header covers, in the "top" layout;
+# Santi's tree, most of these bought): not in the recommended order, whose wiki source didn't place them, but
+# they can be added to tree_order (the Tree order page lists them). Costs as the game shows them; a bought node
+# showed "Unlocked | N". Not located yet: Map, Land Lord, Astral Sword, Astral Blessing, Daily Silver Bonus.
+NODES |= {
+    "Magic Beetle Box": Node((537, 364), 30_000_000_000),
+    "Cheap Cooldown": Node((243, 242), 25),
+    "Boost Kill": Node((177, 272), 10),
+    "Chemical X": Node((367, 452), 9_000_000_000),
+    "Unique Soul Vase": Node((397, 452), 65_000_000_000),
+    "Mirror Force": Node((537, 482), 40_000_000_000_000),
+    "Silver Spirit": Node((397, 572), 50_000_000_000_000),
+    "Shadow Essence": Node((367, 602), 50_000_000_000_000_000),
+    "The Eye of Providence": Node((567, 394), 3_000_000_000_000),
+    "Cyan Ore": Node((567, 454), 40_000_000_000_000),
+    "Board The Platforms": Node((427, 544), 1_500_000_000),
+    "Bad-Tempered": Node((337, 564), 50_000_000_000),
+    "Monolith": Node((117, 272), 15),
+    "Rare Soul Vase": Node((397, 424), 700_000_000),
+    "Cleric's Staff": Node((367, 574), 600_000_000),
+    "Book of Efficiency VI": Node((147, 562), 100_000_000_000_000),
+    "Triple Silvers": Node((537, 394), 20_000_000_000),
+    "Uncontrolled Anger": Node((307, 592), 10_000_000_000),
+    "Reincarnation": Node((507, 424), 2_500_000_000),
+    "Augmented Soul Gatherer": Node((207, 304), 50),
+    "Permanent Slayer": Node((147, 182), 2),
+    "Generations": Node((537, 454), 10_000_000_000_000),
+    "Stones of Time": Node((117, 184), 5),
+    "Souls Surge I": Node((477, 394), 3_000_000_000),
+    "Endless Aggression": Node((307, 534), 15_000_000_000),
+    "Mining Jewels": Node((307, 184), 10),
+    "Soul Reaper": Node((147, 208), 5),
+    "Souls Surge II": Node((507, 392), 5_000_000_000),
+    "Bonus Stage 3": Node((397, 544), 500_000_000),
+    "Random Box Magnet": Node((243, 274), 15),
+    "True Idle Slayer": Node((177, 224), 5),
+    "Sword Edge": Node((145, 244), 15),
+    "Blue Ore": Node((337, 208), 20),
+    "Red Ore": Node((277, 208), 30),
+    "Soul Gatherer Bundle": Node((177, 184), 4),
+    "Gold Hammer": Node((427, 362), 180_000_000),
+    "Boost Coin": Node((243, 208), 25),
+    "Wander's Path": Node((507, 452), 1_000_000_000_000),
+    "Ancient Slayer": Node((207, 272), 25),
+    "Slowmo Bonus": Node((277, 288), 40),
+    "The Chosen One": Node((427, 420), 650_000),
+    "Special Random Box Magnet": Node((347, 152), 25),
+    "Golden Tooth": Node((337, 522), 150_000_000),
+    "Souls Bonus": Node((209, 242), 5),
+    "Reinvest": Node((149, 152), 8),
+    "Permanent Quests": Node((207, 206), 3),
+    "Portal Dominum": Node((377, 173), 5_000_000, "top"),
+}

@@ -10,7 +10,7 @@ from idle_runner.config import Settings
 from idle_runner.game import Game
 from idle_runner.log import event, log
 from idle_runner.minigames.chest_hunt import chest_hunt
-from idle_runner.minigames.bonus_stage import bonus_stage
+from idle_runner.minigames.bonus_stage import bonus_stage, take_second_wind
 from idle_runner.minigames.boss import boss_fight_knight, boss_fight_victor
 from idle_runner.minigames.ascending_heights import ascending_heights
 from idle_runner.portals import portal_ready, take_portal
@@ -24,6 +24,7 @@ WINDOW_RETRY_MS = 2000  # how often to look for the game window again after it i
 BOX_RETRY_MS = 15_000  # buy again this soon after a Random Box stopped a buy
 SIX_COIN_TIMEOUT_MS = 120_000  # buy anyway if the counter stays unreadable this long after reading < 6
 MAX_CONSECUTIVE_CRASHES = 5  # unexpected errors in a row before giving up (e.g. the game window is gone)
+BS1_SECOND_WIND_MS = 240_000  # a Bonus Stage 1 lasts at most 4 sections of 30 s (wiki), their intros and a retry
 
 
 def install_stop_signals() -> None:
@@ -56,6 +57,7 @@ class Runner:
         self.unavailable_reason: str | None = None  # last GameUnavailable, until a tick completes
         self.coins_low_since: float | None = None  # when the counter last read under 6 (after an ascension)
         self.retry_buy_at: float | None = None  # set when a Random Box stopped a buy or the shop did not open
+        self.bs1_until: float | None = None  # while a Bonus Stage 1 runs (left to the jumper): take its Second Wind
 
     def run(self) -> None:
         g = self.game
@@ -142,6 +144,11 @@ class Runner:
         # exactly, one ~7 ms frame at 144 FPS; ±16 covers ~160 ms of each pulse (measured 2026-10-22).
         if g.pixel_search(1130, 610, 1130, 610, 0xCBCB4C, variation=16):
             self._routine("claim_quests", self.shop.claim_quests)
+        # Bonus Stage 1's Second Wind (green (615, 590), Close (716, 600), measured 2026-10-26), once. Never
+        # outside the stage: the same green is the Ascend dialog's "Yes".
+        if self.bs1_until is not None and (g.now() > self.bs1_until or (
+                g.pixel_is(716, 600, 0xAF0000) and take_second_wind(g, "BonusStage1"))):
+            self.bs1_until = None
         if soul_bonus_active(g):  # rage during soul bonus
             g.tap("r")
         if g.pixel_is(99, 113, 0xFFFF7A):  # minions are back
@@ -158,7 +165,9 @@ class Runner:
             self.last_slow = g.now()
             close_all(g)
             if g.pixel_is(660, 254, 0xFFE737) and g.pixel_is(638, 236, 0xFFBB31):  # bonus stage
-                self._routine("bonus_stage", lambda: bonus_stage(g, s.skip_bonus_stage))
+                stage = self._routine("bonus_stage", lambda: bonus_stage(g, s.skip_bonus_stage))
+                if stage == 1 and not s.skip_bonus_stage:
+                    self.bs1_until = g.now() + BS1_SECOND_WIND_MS
             if (g.pixel_is(639, 224, 0xFF878A) and g.pixel_is(634, 224, 0xF263BD)
                     and g.pixel_is(644, 224, 0xFFF38F)):  # boss fight
                 if g.pixel_is(30, 690, 0x0B0303):
@@ -180,7 +189,9 @@ class Runner:
             if (s.ascend_bonus_sample_minutes
                     and g.now() - self.timer_bonus_sample > s.ascend_bonus_sample_minutes * 60_000):
                 self.timer_bonus_sample = g.now()
-                bonus = self._routine("ascend_bonus_sample", self.shop.sample_ascend_bonus)
+                keep_open = s.auto_ascend_percent if s.auto_ascend and s.auto_ascend_percent else None
+                bonus = self._routine("ascend_bonus_sample",
+                                      lambda: self.shop.sample_ascend_bonus(keep_open_at=keep_open))
             # Not in the original: also ascend once the bonus reaches auto_ascend_percent (the wiki's rule).
             reached = bool(s.auto_ascend_percent) and bonus is not None and bonus >= s.auto_ascend_percent
             if s.auto_ascend and (reached or g.now() - self.timer_ascend > s.auto_ascend_minutes * 60_000):

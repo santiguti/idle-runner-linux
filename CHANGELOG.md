@@ -1,5 +1,46 @@
 # Changelog
 
+## v1.5.0 (2026-10-26)
+
+### New
+- **Tree nodes under the header.** At the tree's minimum zoom the header covers the top rows, so the bot couldn't reach them. It now zooms in and moves to the top of the tree for those nodes, a view that is also always the same. Ancient Quests and Hot Desert are back at the head of the recommended order, and Bullet Time is in it.
+- **50 more tree nodes the bot knows** (surveyed in the game), from Magic Beetle Box to Portal Dominum, with their costs. They aren't in the recommended order, but you can add any of them on the Tree order page. Still not located: Map, Land Lord, Astral Sword, Astral Blessing and Daily Silver Bonus.
+
+### Fixed
+- **No clicks over another window.** If a notification or an overlay sits over the game where the bot is about to click, scroll or drag, it doesn't press the button: it pauses that action like a focus loss and keeps the moment in the black box.
+
+## v1.4.0 (2026-10-26)
+
+A new window, and smarter shop visits.
+
+### New
+- **A new window**, styled after Idle Slayer's own panels:
+  - **Dashboard:** what the bot is doing, whether the game is found at 1280×720, this run's numbers (upgrades, ascensions, last bonus, tree nodes, problems…) and the latest events.
+  - **Settings:** every option in plain words with what it does, saved as you change it. A wrong value is shown right there, by name.
+  - **Tree order:** choose which Ascension Tree nodes the bot buys, and in what order. Drag them, add or remove them, search, or go back to the recommended order. Nodes bought this run are marked.
+  - **Activity:** everything the bot did, filtered by purchases, ascensions, minigames or problems. Also the bot's own output, statistics and the logs folder.
+  - **Help:** the game setup the bot needs, what it never does, and links.
+  - It tells you when a new version is out.
+- **One bot at a time.** A second bot, from the window or a terminal, stops at once with "another Idle Runner bot is already running": two bots would fight over the keys.
+
+### Changed
+- **Quest rewards are claimed in the same shop visit** as the purchases, when the Quests tab glows. A glowing shop button alone no longer starts a claim: it also glows for other things, and claims ran with nothing to claim. Each reward button is clicked once (it was clicked 2 or 3 times).
+- **After an ascension the bot doesn't open the shop right away.** The game shows the shop button only with the first coins, so that buy failed every time (7 of 7 on 2026-10-26). The buy at 6 coins takes care of it.
+- **Ascending at a bonus uses the panel the bonus was read from.** Closing it and opening it again right away lost the click 4 times of 7, two seconds each.
+- The window stops the bot by closing its input instead of sending Ctrl+C. The bot also stops, releasing every key, if the window crashes.
+
+### Under the hood
+- A Windows backend (stdlib `ctypes`: screen capture, `SendInput`, per-monitor DPI awareness). Its input is tested on Linux with fake DLLs and its real calls on GitHub's Windows machines. It hasn't been tried with the game on Windows yet: v2.0.0 will be the release that has.
+
+## v1.3.1 (2026-10-26)
+
+### Fixed
+- **Bonus Stage 1.** While the Ascension Tree's "Bonus Stage 2" node isn't bought (for example after an Ultra Ascension), the game shows Bonus Stage 1, which the bot didn't know. It played it with Bonus Stage 2's moves, failed at once, and kept going for about 2.5 minutes after the stage had ended, pressing the jump key in the normal run with the jumper paused. It now recognises Bonus Stage 1 on its start screen, swipes, lets the jumper play it and takes Second Wind once. With `skip_bonus_stage` it waits the stage out, as before.
+- **Tree purchases taken for a jewel offer.** Twice on 2026-10-26 a node bought with Slayer Points was taken for the offer to pay with jewels, because the pressed Buy button briefly has the jewel button's colour. Nothing was spent, but the run stopped there and the purchase wasn't logged. The bot now needs both the jewel button and the offer's "I understand" box, seen twice 0.1 s apart. It also keeps watching long enough for an offer that shows late.
+
+### Changed
+- A jewel offer that does show now keeps a black-box mark, and nodes skipped because a prerequisite is missing are logged as "Tree node locked".
+
 ## v1.3.0 (2026-10-26)
 
 Groundwork for the Windows version. Nothing changes in how the bot plays.

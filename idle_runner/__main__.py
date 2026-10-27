@@ -11,7 +11,7 @@ import numpy as np
 from idle_runner import __version__
 from idle_runner.blackbox import BlackBox, mark
 from idle_runner.png import write_png
-from idle_runner.process import self_command
+from idle_runner.process import self_command, single_instance, stop_on_stdin_eof
 from idle_runner.config import Settings, load_settings
 from idle_runner.game import Game, GameUnavailable, open_backend
 from idle_runner.log import setup_logging
@@ -85,9 +85,13 @@ def read_settings(config_path: Path) -> Settings | None:
         return None
 
 
-def run_bot(config_path: Path) -> int:
+def run_bot(config_path: Path, stop_on_eof: bool = False) -> int:
     settings = read_settings(config_path)
     if settings is None:
+        return 1
+    instance = single_instance()
+    if instance is None:
+        print("error: another Idle Runner bot is already running", file=sys.stderr)
         return 1
     log_dir = Path(settings.log_dir)
     setup_logging(log_dir, settings.log_level)
@@ -96,18 +100,27 @@ def run_bot(config_path: Path) -> int:
                 log_dir / "frames" if settings.save_frames else None)
     jumper = Repeater(game, ("Up", "Right"), settings.jump_interval_ms, "jumper")
     install_stop_signals()
+    if stop_on_eof:
+        stop_on_stdin_eof(sys.stdin)
     recorder = None
     if settings.blackbox_fps:
-        recorder = subprocess.Popen(self_command("blackbox", "--config", str(config_path)))
+        # It stops when this pipe closes: here, or by the OS if this process is killed outright.
+        recorder = subprocess.Popen(self_command("blackbox", "--config", str(config_path), "--stop-on-stdin-eof"),
+                                    stdin=subprocess.PIPE)
     try:
         Runner(game, settings, jumper).run()
     finally:
         if recorder:
-            recorder.terminate()
+            recorder.stdin.close()
+            try:
+                recorder.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                recorder.terminate()
+        instance.close()
     return 0
 
 
-def run_blackbox(config_path: Path) -> int:
+def run_blackbox(config_path: Path, stop_on_eof: bool = False) -> int:
     settings = read_settings(config_path)
     if settings is None:
         return 1
@@ -115,6 +128,8 @@ def run_blackbox(config_path: Path) -> int:
         print("error: the black box is off (blackbox_fps = 0)", file=sys.stderr)
         return 1
     install_stop_signals()
+    if stop_on_eof:
+        stop_on_stdin_eof(sys.stdin)
     box = BlackBox(open_backend(settings.window_name), Path(settings.log_dir), settings.blackbox_minutes)
     try:
         box.run(settings.blackbox_fps)
@@ -156,12 +171,14 @@ def main(argv: list[str] | None = None) -> int:
 
     run = sub.add_parser("run", help="run the bot (Ctrl+C to stop)")
     run.add_argument("--config", type=Path, default=Path("config.toml"))
+    run.add_argument("--stop-on-stdin-eof", action="store_true", help="stop when stdin closes (used by the window)")
 
     gui = sub.add_parser("gui", help="open the Idle Runner window")
     gui.add_argument("--config", type=Path, default=Path("config.toml"))
 
     blackbox = sub.add_parser("blackbox", help="only record the game (`run` starts this by itself)")
     blackbox.add_argument("--config", type=Path, default=Path("config.toml"))
+    blackbox.add_argument("--stop-on-stdin-eof", action="store_true", help="stop when stdin closes (used by the window)")
 
     mark_cmd = sub.add_parser("mark", help="note a problem; keeps the black box's last minutes in logs/marks/")
     mark_cmd.add_argument("text", help="what you saw")
@@ -179,12 +196,12 @@ def main(argv: list[str] | None = None) -> int:
             print("\n".join(summarize(args.log_dir / "events.jsonl")))
             return 0
         if args.command == "run":
-            return run_bot(args.config)
+            return run_bot(args.config, args.stop_on_stdin_eof)
         if args.command == "gui":
-            from idle_runner.gui import main as gui_main  # tkinter only loads for the window
+            from idle_runner.ui.app import main as gui_main  # tkinter only loads for the window
             return gui_main(args.config)
         if args.command == "blackbox":
-            return run_blackbox(args.config)
+            return run_blackbox(args.config, args.stop_on_stdin_eof)
         if args.command == "mark":
             setup_logging(args.log_dir)
             print(f"saved to {mark(args.log_dir, args.text, args.minutes)}")

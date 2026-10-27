@@ -40,6 +40,7 @@ class Backend(Protocol):
     def is_active(self) -> bool: ...
     def grab(self, x: int, y: int, w: int, h: int) -> np.ndarray: ...
     def move(self, x: int, y: int) -> None: ...
+    def pointer_over_game(self) -> bool: ...
     def button(self, button: int, down: bool) -> None: ...
     def key(self, name: str, down: bool) -> None: ...
     def now_ms(self) -> float: ...
@@ -201,6 +202,14 @@ class Game:
         event("click_outside_window", x=x, y=y)
         return None
 
+    def _require_pointer_on_game(self) -> None:
+        """C8, not in the original: never press a button over another window (a notification, Steam's
+        overlay). X11 reports the window under the pointer right after an XTEST move (50 of 50 at 0 ms,
+        measured 2026-10-26). Aborts the routine like a focus loss."""
+        if not self.backend.pointer_over_game():
+            event("click_outside_window", covered=True)
+            raise GameUnavailable("another window is over the game under the pointer")
+
     def move(self, x: int, y: int) -> None:
         """MouseMove(x, y, 0)."""
         self._require_focus()
@@ -217,6 +226,7 @@ class Game:
         if point is None:
             return
         self.backend.move(*point)
+        self._require_pointer_on_game()
         for _ in range(clicks):
             self.backend.button(LEFT, True)
             self.sleep(10)
@@ -237,6 +247,7 @@ class Game:
         self._require_focus()
         inputs.info("wheel %s x%d", "up" if up else "down", notches)
         button = WHEEL_UP if up else WHEEL_DOWN
+        self._require_pointer_on_game()
         for _ in range(notches):
             self.backend.button(button, True)
             self.backend.button(button, False)
@@ -249,6 +260,7 @@ class Game:
         if start is None or end is None:
             return
         self.backend.move(*start)
+        self._require_pointer_on_game()
         self.backend.button(LEFT, True)
         self.sleep(250)
         steps = 20

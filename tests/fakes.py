@@ -24,6 +24,7 @@ class FakeBackend:
         self.t = 0.0
         self.cost_ms = 1.0
         self.active = True
+        self.pointer_over = True  # False: another window is under the pointer
         self.realtime = False  # also really sleep (for threaded tests)
         self.stop_at: float | None = None  # raise KeyboardInterrupt once t reaches this
         self.pointer = (0, 0)
@@ -59,6 +60,9 @@ class FakeBackend:
     def move(self, x: int, y: int) -> None:
         self.pointer = (x, y)
         self._record(("move", x, y))
+
+    def pointer_over_game(self) -> bool:
+        return self.pointer_over
 
     def button(self, button: int, down: bool) -> None:
         if button == 1 and down:

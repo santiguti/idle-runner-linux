@@ -96,6 +96,12 @@ class X11Backend:
             xtest.fake_input(self._display, X.MotionNotify, x=origin_x + x, y=origin_y + y)
             self._display.sync()
 
+    def pointer_over_game(self) -> bool:
+        """The game is the top-level window under the pointer (XWayland: no frame window in between)."""
+        with self._lock:
+            child = self._root.query_pointer().child
+            return bool(child) and child.id == self._window.id
+
     def button(self, button: int, down: bool) -> None:
         with self._lock:
             xtest.fake_input(self._display, X.ButtonPress if down else X.ButtonRelease, button)

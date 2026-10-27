@@ -96,12 +96,15 @@ def test_auto_ascend_when_the_sampled_bonus_reaches_its_percent(game, fake, jump
                        ascend_bonus_sample_minutes=0.1)
     runner = Runner(game, settings, jumper)
     ascended = []
-    monkeypatch.setattr(runner.shop, "sample_ascend_bonus", lambda: bonus)
+    asked = []
+    monkeypatch.setattr(runner.shop, "sample_ascend_bonus", lambda keep_open_at=None: asked.append(keep_open_at)
+                        or bonus)
     monkeypatch.setattr(runner.shop, "auto_ascend", lambda: ascended.append(fake.t) is None)
     fake.t += 7_000
     runner.tick()  # the 60-minute timer isn't due
 
     assert bool(ascended) is ascends
+    assert asked == [10]  # the panel stays open when the bonus reaches 10 %, for the ascension
 
 
 def test_focus_loss_mid_routine_aborts_without_more_input(game, fake, jumper, event_names) -> None:
@@ -510,3 +513,36 @@ def test_buying_resumes_soon_after_a_box_interrupts_it(game, fake, jumper, event
         runner.tick()
 
     assert len(buys) == 2 and buys[1] - buys[0] <= BOX_RETRY_MS + 10_000
+
+
+def bonus_stage_1_starts(fake, runner, monkeypatch) -> None:
+    monkeypatch.setattr(runner_module, "bonus_stage", lambda g, skip: 1)
+    fake.paint(660, 254, 0xFFE737)  # the start screen's star
+    fake.paint(638, 236, 0xFFBB31)
+    fake.t += 6_000
+    runner.tick()
+    fake.paint(660, 254, 0)
+    fake.paint(638, 236, 0)
+
+
+def test_second_wind_is_taken_once_in_bonus_stage_1(game, fake, jumper, monkeypatch, event_names) -> None:
+    runner = Runner(game, Settings(), jumper)
+    bonus_stage_1_starts(fake, runner, monkeypatch)
+    for _ in range(2):  # the first fail, and a second one after the retry
+        fake.paint(615, 590, 0x00A400)
+        fake.paint(716, 600, 0xAF0000)
+        fake.t += 30_000
+        runner.tick()
+
+    assert fake.clicks().count((560, 600)) == 1
+    assert event_names().count("BonusStage1 Retry") == 1
+
+
+def test_second_wind_button_is_never_clicked_outside_bonus_stage_1(game, fake, jumper) -> None:
+    # The same green is the Ascend dialog's "Yes" (client 493-624 x 525-578).
+    runner = Runner(game, Settings(), jumper)
+    fake.paint(615, 590, 0x00A400)
+    fake.paint(716, 600, 0xAF0000)
+    runner.tick()
+
+    assert (560, 600) not in fake.clicks()

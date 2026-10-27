@@ -124,7 +124,8 @@ def test_reset_restores_the_recommended_order(root) -> None:
     page.reset()
 
     assert changes[-1] == RECOMMENDED_ORDER and rows(page.order_view) == list(RECOMMENDED_ORDER)
-    assert rows(page.rest_view) == []
+    # Only the nodes surveyed outside the wiki's order (2026-10-26) are left out.
+    assert set(rows(page.rest_view)) == set(NODES) - set(RECOMMENDED_ORDER) != set()
 
 
 def test_set_order_refreshes_without_reporting(root) -> None:

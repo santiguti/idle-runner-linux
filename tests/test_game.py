@@ -169,3 +169,16 @@ def test_open_backend_picks_the_platform(monkeypatch) -> None:
     monkeypatch.setattr(sys, "platform", "win32")
 
     assert open_backend("Idle Slayer") == ("win32", "Idle Slayer")
+
+
+@pytest.mark.parametrize("act", [lambda g: g.click(400, 300), lambda g: g.wheel(up=True, notches=1),
+                                 lambda g: g.drag(400, 300, 500, 300)])
+def test_no_button_when_another_window_is_under_the_pointer(game, fake, events, act) -> None:
+    # C8: measured 2026-10-26, X11 reports the window under the pointer right after an XTEST move (50/50).
+    fake.pointer_over = False
+
+    with pytest.raises(GameUnavailable, match="another window"):
+        act(game)
+
+    assert not [a for a in fake.actions if a[0] in ("button", "click")]
+    assert [r["event"] for r in events()].count("click_outside_window") == 1

@@ -62,5 +62,6 @@ jobs:
           files: |
             ${{ env.ASSET }}
             ${{ env.ASSET }}.sha256
+          name: Idle Runner ${{ github.ref_name }} (Windows + Linux)
           body_path: release-notes.md
           prerelease: ${{ contains(github.ref_name, '-') }}

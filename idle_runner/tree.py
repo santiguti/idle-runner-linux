@@ -1,6 +1,6 @@
 """Buy Ascension Tree nodes in the user's order. Not in the original (user's request, 2026-10-26).
 
-Measured 2026-10-26 (docs/next-steps.md, "Tree session"): the tree keeps its last pan and zoom, but at
+Measured 2026-10-26: the tree keeps its last pan and zoom, but at
 its minimum zoom every node is always at the same place, so the routine zooms all the way out first.
 Clicking a node ("Buy on Click" off) opens a modal whose pixel at (468, 571) tells its state: green = Buy
 (the prerequisites are met, not necessarily the SP), red = one wide button, "Can't buy yet" (a
@@ -45,15 +45,38 @@ class Tree:
         # hand while the bot runs makes this stale: restart the bot after one.
         self.bought: set[str] = set()
         # Nodes seen locked ("Can't buy yet") since the last purchase: only a purchase unlocks a node.
+        self.layout = "min"  # the tree's zoom (Node.layout), set by show_layout
         self.locked: set[str] = set()
 
     def buy(self) -> None:
         g = self.game
         if self.open_tree():
             for name in self.order:
-                if name not in self.bought | self.locked and not self.buy_node(name, NODES[name].point):
+                if name in self.bought | self.locked:
+                    continue
+                node = NODES[name]
+                if node.layout != self.layout:
+                    self.show_layout(node.layout)
+                if not self.buy_node(name, node.point):
                     break
         g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
+
+    def show_layout(self, layout: str) -> None:
+        """Zoom the tree to one of its two fixed layouts (Node.layout). "min": all the way out, where every node
+        has a fixed place (2026-10-26). "top": from there 3 notches in at the same spot, then dragged to the top
+        edge: also fixed (best alignment shift (0, 0) over two tries, 2026-10-26), and it shows the rows the
+        header covers at minimum zoom. Dragging doesn't move the tree at minimum zoom."""
+        g = self.game
+        g.move(328, 411)  # over the tree
+        g.wheel(up=False, notches=20)  # minimum zoom: 10 notches were already enough
+        g.sleep(600)  # measured: settled 0.6 s after the wheel
+        if layout == "top":
+            g.wheel(up=True, notches=3)
+            g.sleep(600)
+            for _ in range(3):  # inertia is ~30 px: the third drag ends against the top edge
+                g.drag(328, 200, 328, 620)
+                g.sleep(400)
+        self.layout = layout
 
     def open_tree(self) -> bool:
         g = self.game
@@ -62,9 +85,7 @@ class Tree:
             deadline = g.now() + 2000
             while g.now() <= deadline:
                 if g.pixel_search(158, 676, 158, 676, TAB_SELECTED, variation=6):
-                    g.move(328, 411)  # over the tree
-                    g.wheel(up=False, notches=20)  # minimum zoom: 10 notches were already enough
-                    g.sleep(600)  # measured: settled 0.6 s after the wheel
+                    self.show_layout("min")
                     return True
                 g.sleep(10)
         event("Tree not shown")
@@ -84,6 +105,7 @@ class Tree:
             return self.close_modal(648, 582)  # its wide "Close" button
         if state == "locked":  # a prerequisite comes later in the wiki's order: go on
             self.locked.add(name)
+            event("Tree node locked", node=name)
             return self.close_modal(648, 582)  # "Can't buy yet"
         if state != "buy":
             event("Tree stopped", node=name, reason="no modal")
@@ -150,19 +172,30 @@ class Tree:
             return "unlocked"
         return None
 
+    def jewel_offer(self) -> bool:
+        """The offer to pay the missing SP with jewels: its jewel button and its unticked "I understand" box
+        both show (live 2026-10-26, steady for over 0.7 s). A purchase that goes through shows the pressed Buy
+        button in the jewel button's colour for a moment, but never the white box (live 18:47 and 20:04)."""
+        g = self.game
+        return g.pixel_is(*MODAL_STATE, JEWEL_BUTTON) and g.pixel_is(583, 521, 0xFFFFFF)
+
     def jewel_offer_closed(self, name: str) -> bool:
-        """After Buy: if the jewel offer shows within 1 s, click its Close (never its box or its jewel
-        button) and return True."""
+        """After Buy: if the jewel offer shows within 1 s (two equal reads 100 ms apart), click its Close
+        (never its box or its jewel button) and return True. False once no modal dims the panel (the
+        purchase went through) or after 1 s. The pressed Buy button is neither green nor red, so "no modal"
+        can't be read from MODAL_STATE here: it ended this wait early, before a late offer could show."""
         g = self.game
         deadline = g.now() + 1000
         while g.now() <= deadline:
-            if g.pixel_is(*MODAL_STATE, JEWEL_BUTTON) or g.pixel_is(583, 521, 0xFFFFFF):
-                g.click(758, 582)  # Close
-                event("Tree jewel offer closed", node=name)
-                g.save_frame("tree-jewel-offer")
-                self.wait_modal_gone()
-                return True
-            if self.modal() is None:
+            if self.jewel_offer():
+                g.sleep(100)
+                if self.jewel_offer():
+                    g.click(758, 582)  # Close
+                    event("Tree jewel offer closed", node=name)
+                    g.save_frame("tree-jewel-offer")
+                    self.wait_modal_gone()
+                    return True
+            elif g.pixel_is(538, 681, PANEL_X_RED):
                 return False
             g.sleep(10)
         return False

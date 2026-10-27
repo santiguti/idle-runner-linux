@@ -43,7 +43,7 @@ class TreePage(ttk.Frame):
         bar.pack(fill="x", pady=(0, 8))
 
         ttk.Label(self, text="Bought by the bot, in this order").pack(anchor="w")
-        self.order_view = self._table(("#", "Node", "Cost (SP)", "Status"), 12)
+        self.order_view = self._table(("#", "Node", "Cost (SP)", "Status"), 10)
         self.order_view.bind("<ButtonPress-1>", lambda e: setattr(self, "_dragged", self.order_view.identify_row(e.y)))
         self.order_view.bind("<ButtonRelease-1>", self._release)
         buttons = ttk.Frame(self)
@@ -53,7 +53,7 @@ class TreePage(ttk.Frame):
         buttons.pack(anchor="w", pady=8)
 
         ttk.Label(self, text="Not bought by the bot").pack(anchor="w")
-        self.rest_view = self._table(("Node", "Cost (SP)"), 6)
+        self.rest_view = self._table(("Node", "Cost (SP)"), 5)
         self.rest_view.bind("<Double-1>", lambda e: self.add())
         ttk.Button(self, text="Add", command=self.add).pack(anchor="w", pady=8)
         self.refresh()

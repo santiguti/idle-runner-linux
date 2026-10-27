@@ -1,6 +1,12 @@
+from pathlib import Path
+
+import pytest
+
 from idle_runner.tree import Tree
 from idle_runner.tree_nodes import NODES, RECOMMENDED_ORDER
-from tests.fakes import OFFSET
+from tests.fakes import OFFSET, read_png
+
+FIXTURES = Path(__file__).parent / "fixtures" / "tree"
 
 ORDER = [(n, NODES[n].point) for n in RECOMMENDED_ORDER]
 
@@ -19,13 +25,15 @@ class FakeTree:
     Hovering a node shows its tooltip: a 262626 box from x + 43, centred on the pointer, with "Cost: N" in
     11AA23 when the SP is enough and AD1111 when it isn't, next to the SP icon (6A31CA); a bought node's
     says "Unlocked", also 11AA23 (measured 2026-10-25). `tooltips=False` hides them; `lying_tooltips`
-    shows green for every node.
+    shows green for every node. `press_ms` > 0: a purchase that goes through first shows the pressed Buy
+    button for that long, in the jewel button's colour (live, 18:47 and 20:04 on 2026-10-26; its box
+    stays dark).
     """
 
     FADE_MS = 300
 
     def __init__(self, fake, bought=(), locked=(), poor=(), tooltips: bool = True,
-                 lying_tooltips: bool = False) -> None:
+                 lying_tooltips: bool = False, press_ms: float = 0) -> None:
         self.fake = fake
         self.bought, self.locked, self.poor = set(bought), set(locked), set(poor)
         self.tooltips, self.lying_tooltips = tooltips, lying_tooltips
@@ -35,10 +43,16 @@ class FakeTree:
         self.tooltip_at: tuple[int, int] | None = None
         self.panel_open = False
         self.fade_until = -1.0
+        self.press_ms = press_ms
+        self.bought_at: float | None = None  # when a pressed Buy goes through
         fake.on_action = self.act
         grab = fake.grab
 
         def grab_after_fade(x: int, y: int, w: int, h: int):
+            if self.bought_at is not None and fake.t >= self.bought_at:
+                self.bought_at = None
+                self.bought.add(self.modal_for)
+                self.hide()
             if self.panel_open and self.modal_for is None and fake.t >= self.fade_until:
                 fake.paint(538, 681, 0xAD1111)
             return grab(x, y, w, h)
@@ -71,6 +85,9 @@ class FakeTree:
                 self.jewel_offer = True
                 self.fake.paint(468, 571, 0x094309)
                 self.fake.paint(583, 521, 0xFFFFFF)
+            elif self.press_ms:
+                self.fake.paint(468, 571, 0x094309)  # pressed; the box at (583, 521) stays dark
+                self.bought_at = self.fake.t + self.press_ms
             else:
                 self.bought.add(self.modal_for)
                 self.hide()
@@ -155,7 +172,7 @@ def test_zooms_all_the_way_out_before_clicking_a_node(game, fake) -> None:
 
     wheel_downs = [i for i, a in enumerate(fake.actions) if a == ("button", 5, True)]
     first_node = next(i for i, a in enumerate(fake.actions) if a == ("click", ORDER[0][1][0] - 8, ORDER[0][1][1] - 31))
-    assert len(wheel_downs) == 20 and wheel_downs[-1] < first_node
+    assert len(wheel_downs) >= 20 and wheel_downs[19] < first_node  # more follow: back from the "top" layout
 
 
 def test_never_buys_a_node_whose_tooltip_shows_the_cost_in_red(game, fake, events) -> None:
@@ -234,3 +251,55 @@ def test_nodes_outside_the_order_are_never_touched(game, fake) -> None:
     Tree(game, ("Portals",)).buy()
 
     assert set(nodes_clicked(fake)) == {"Portals"}
+
+
+def test_a_pressed_buy_button_is_not_a_jewel_offer(game, fake, events, event_names) -> None:
+    # Live 2026-10-26 (Portal Traveler 18:47, Legendary Belt 20:04): the purchases went through, but the
+    # pressed Buy button 22 ms after the click was taken for the jewel offer, so the run stopped there.
+    tree = FakeTree(fake, press_ms=60)
+    Tree(game, RECOMMENDED_ORDER[:2]).buy()
+
+    assert "Tree jewel offer closed" not in event_names()
+    assert (758, 582) not in fake.clicks()
+    assert [r["node"] for r in events() if r["event"] == "Tree node bought"] == [name(0), name(1)]
+    assert tree.bought == {name(0), name(1)}
+
+
+@pytest.mark.parametrize(("frame", "offer"), [("jewel-offer", True), ("pressed-buy", False)])
+def test_the_jewel_offer_on_recorded_frames(game, fake, frame: str, offer: bool) -> None:
+    # jewel-offer: 02:11:05 on 2026-10-26 (Portal Traveler, 95 SP of 200); pressed-buy: 20:04:02, 49 ms after
+    # Legendary Belt's Buy, a purchase that went through.
+    fake.frame[:] = read_png(FIXTURES / f"{frame}.png")
+
+    assert Tree(game, ()).jewel_offer() is offer
+
+
+def test_a_locked_node_is_logged(game, fake, events) -> None:
+    FakeTree(fake, locked={name(0)}, poor={name(1)})
+    Tree(game, RECOMMENDED_ORDER).buy()
+
+    assert [r["node"] for r in events() if r["event"] == "Tree node locked"] == [name(0)]
+
+
+def test_nodes_under_the_header_are_bought_from_the_top_layout(game, fake) -> None:
+    # At minimum zoom the header covers the top rows; 3 notches in and dragged to the top they show, always
+    # at the same place (2026-10-26).
+    FakeTree(fake)
+    Tree(game, ("Ancient Quests", "Village Key")).buy()
+
+    actions = fake.actions
+    zoom_in = actions.index(("button", 4, True))
+    quests = next(i for i, a in enumerate(actions) if a[0] == "click"
+                  and (a[1] + OFFSET[0], a[2] + OFFSET[1]) == NODES["Ancient Quests"].point)
+    key = next(i for i, a in enumerate(actions) if a[0] == "click"
+               and (a[1] + OFFSET[0], a[2] + OFFSET[1]) == NODES["Village Key"].point)
+    assert NODES["Ancient Quests"].layout == "top" and NODES["Village Key"].layout == "min"
+    assert zoom_in < quests < key
+    assert any(a == ("button", 5, True) for a in actions[quests:key])  # back to minimum zoom first
+
+
+def test_every_node_point_is_clear_of_the_header_and_the_tab_bar() -> None:
+    # The header holds the "Buy on Click" toggle (95, 90): a click there would make every node click a buy.
+    for name, node in NODES.items():
+        x, y = node.point
+        assert 15 + 8 <= x <= 615 + 8 and 105 + 31 <= y <= 620 + 31, name

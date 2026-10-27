@@ -1,13 +1,14 @@
 [project]
 name = "idle-slayer-bot"
 dynamic = ["version"]
-description = "Idle Runner: an Idle Slayer bot (pixel-based, keyboard and mouse only) for Linux, Windows support in progress"
+description = "Idle Runner: an Idle Slayer bot for Linux and Windows that plays by reading the screen"
 readme = "README.md"
 license = {file = "LICENSE"}
-keywords = ["idle-slayer", "idle-slayer-bot", "idle-game", "bot", "automation"]
+keywords = ["idle-slayer", "idle-slayer-bot", "idle-game", "bot", "automation", "linux", "windows"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
     "Topic :: Games/Entertainment",
 ]
 requires-python = ">=3.12"
@@ -40,3 +41,5 @@ include = ["idle_runner*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = ["desktop: drives a real window with real input (opt-in: -m desktop)"]
+addopts = "-m 'not desktop'"

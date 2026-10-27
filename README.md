@@ -4,15 +4,19 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-orange">
+  <img alt="Linux and Windows (beta)" src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20(beta)-orange">
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab">
 </p>
 
 # Idle Runner
 
-**An Idle Slayer bot for Linux** (Windows support is in progress). It plays [Idle Slayer](https://store.steampowered.com/app/1353300/Idle_Slayer/) for you on Linux. It jumps, collects boxes, buys upgrades, plays the minigames, ascends when it's worth it and spends your Slayer Points on the Ascension Tree.
+**An Idle Slayer bot for Linux and Windows** (Windows is in beta). It plays [Idle Slayer](https://store.steampowered.com/app/1353300/Idle_Slayer/) for you. It jumps, collects boxes, buys upgrades, plays the minigames, ascends when it's worth it and spends your Slayer Points on the Ascension Tree.
 
 It only **looks at the game window and presses keys**, the same way you would. It never touches the game's memory, files or saves.
+
+<p align="center">
+  <img src="docs/images/ui-dashboard.png" alt="The Idle Runner window: the bot is running, with this run's purchases, ascensions and latest events" width="80%">
+</p>
 
 <p align="center">
   <img src="docs/images/gameplay.png" alt="The bot running through the hills while a silver box appears" width="49%">
@@ -86,7 +90,7 @@ flowchart LR
 
 ## 📦 Install
 
-You need the **Steam version of Idle Slayer for Linux** and Python 3.12 or newer (most recent distributions include it).
+On Linux you need the **Steam version of Idle Slayer for Linux** and Python 3.12 or newer (most recent distributions include it). On Windows, see *Windows* below.
 
 **1. Install it.** The quick way, with [pipx](https://pipx.pypa.io/):
 
@@ -111,13 +115,32 @@ python3 -m venv .venv
 - Enable *rounded bulk* and *hide locked quest rewards*.
 - Don't buy the **Vertical Magnet**.
 
-**3. Start it:**
+**3. Start it:** `idle-runner` (or `.venv/bin/python -m idle_runner`) opens the window.
 
-```bash
-.venv/bin/python -m idle_runner gui
+Press **Start**, then click on the game. The bot only plays while the game window is focused: switch to another window to pause it, and click the game again to resume. The window shows:
+
+- **Dashboard:** what the bot is doing, whether the game is found at the right size, this run's numbers and the latest events.
+- **Settings:** every option in plain words, saved as you change it.
+- **Tree order:** which Ascension Tree nodes the bot buys, and in what order. Drag them, add or remove them, or go back to the recommended order.
+- **Activity:** everything the bot did, filtered by purchases, ascensions, minigames or problems.
+- **Help:** the game setup above, what the bot never does, and links.
+
+<details>
+<summary>Windows</summary>
+
+The Windows version is written and tested automatically, but it hasn't been tried with the game on a real Windows PC yet. Until it has, it's a beta: run it from source in PowerShell (Python 3.12 or newer), and please [report how it goes](../../issues/new/choose).
+
+```powershell
+git clone https://github.com/santiguti/idle-slayer-bot.git
+cd idle-slayer-bot
+py -m venv .venv
+.venv\Scripts\pip install -e .
+.venv\Scripts\idle-runner
 ```
 
-Press **Start**, then click on the game. The bot only plays while the game window is focused: switch to another window to pause it, and click the game again to resume.
+From v2.0.0 on, each release also has a ready-made `IdleRunner-…-windows-x64.zip`.
+
+</details>
 
 > [!WARNING]
 > **Auto-ascend and tree buying are off by default, and neither can be undone.** Ascending resets your run, and tree nodes spend your SP. Turn them on only if you want the bot to do it for you.
@@ -144,7 +167,12 @@ The first time the bot presses a key, KDE Plasma on Wayland asks whether to allo
 
 ## ⚙️ Settings
 
-Every setting is in the bot's window. You can also copy `config.example.toml` to `config.toml` and edit it. Each line is explained in the file.
+Every setting is in the window's Settings page, with what it does. You can also copy `config.example.toml` to `config.toml` and edit it. Each line is explained in the file.
+
+<p align="center">
+  <img src="docs/images/ui-settings.png" alt="The Settings page" width="49%">
+  <img src="docs/images/ui-tree-order.png" alt="The Tree order page" width="49%">
+</p>
 
 To ascend by percentage, set both `ascend_bonus_sample_minutes` (how often the bonus is read, e.g. 5) and `auto_ascend_percent`. To change which tree nodes are bought, and in what order, list them under `tree_order` in the `[tree]` section of `config.toml` (every valid name is in [`idle_runner/tree_nodes.py`](idle_runner/tree_nodes.py)). Without it, the bot uses the recommended order.
 

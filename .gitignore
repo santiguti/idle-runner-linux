@@ -5,3 +5,9 @@ __pycache__/
 logs/
 config.toml
 probe.png
+
+# Development notes and plans: kept local
+CLAUDE.md
+docs/next-steps.md
+docs/superpowers/
+.superpowers/

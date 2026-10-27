@@ -7,9 +7,9 @@ def test_recommended_order_names_known_nodes_once() -> None:
 
 
 def test_the_user_order_of_98d31ce_comes_first() -> None:
-    assert RECOMMENDED_ORDER[:9] == (
+    assert RECOMMENDED_ORDER[:11] == (
         "Village Key", "Idle Earrings I", "Idle Earrings II", "Blessing of Cronus", "Portals",
-        "Green Ore", "Pink Ore", "Soul Gem", "Portal Traveler")
+        "Green Ore", "Pink Ore", "Soul Gem", "Ancient Quests", "Hot Desert", "Portal Traveler")
     assert RECOMMENDED_ORDER[-1] == "Ultra Ascension"  # the node the bot never uses comes last
 
 

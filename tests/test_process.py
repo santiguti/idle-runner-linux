@@ -1,6 +1,8 @@
+import os
 import sys
+import threading
 
-from idle_runner.process import self_command
+from idle_runner.process import self_command, single_instance, stop_on_stdin_eof
 
 
 def test_self_command_from_source() -> None:
@@ -13,3 +15,24 @@ def test_self_command_frozen(monkeypatch) -> None:
 
     assert self_command("run", "--config", "config.toml") == [
         r"C:\Juegos\Idle Runner é\IdleRunner.exe", "run", "--config", "config.toml"]
+
+
+def test_stdin_eof_stops() -> None:
+    read_fd, write_fd = os.pipe()
+    stopped = threading.Event()
+    stop_on_stdin_eof(os.fdopen(read_fd), stopped.set)
+    assert not stopped.wait(0.1)
+
+    os.close(write_fd)  # the window closed the pipe (Stop), or died
+
+    assert stopped.wait(1)
+
+
+def test_second_instance_is_refused() -> None:
+    first = single_instance(port=0)  # any free port
+    assert first is not None
+    port = first.getsockname()[1]
+    assert single_instance(port=port) is None
+
+    first.close()  # that bot stopped
+    assert single_instance(port=port) is not None
