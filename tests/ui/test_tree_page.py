@@ -1,6 +1,4 @@
-import tkinter as tk
 
-import pytest
 
 from idle_runner.tree_nodes import NODES, RECOMMENDED_ORDER
 from idle_runner.ui.tree_page import TreePage, exclude, include, move
@@ -31,16 +29,6 @@ def test_include_and_exclude_are_idempotent() -> None:
     assert include(("a", "b"), "a") == ("a", "b")
     assert exclude(("a", "b"), "z") == ("a", "b")
 
-
-@pytest.fixture
-def root():
-    try:
-        window = tk.Tk()
-    except tk.TclError:
-        pytest.skip("no display")
-    window.withdraw()  # never mapped: it can't take the game's focus
-    yield window
-    window.destroy()
 
 
 def rows(tree) -> list[str]:

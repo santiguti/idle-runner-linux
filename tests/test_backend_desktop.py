@@ -45,8 +45,12 @@ def test_the_backend_finds_reads_and_drives_a_window() -> None:
 
         assert backend.size() == (400, 300)
         assert pump(root, backend.is_active), "the test window never became the foreground window"
-        assert backend.grab(10, 10, 1, 1)[0, 0].tolist() == [0x83, 0x03, 0x99]
-        assert backend.grab(300, 10, 1, 1)[0, 0].tolist() == [0x11, 0xA6, 0x22]
+        # Foreground isn't on screen yet (Windows fades new windows in), and grab reads the screen.
+        def pixel(x: int, y: int) -> list[int]:
+            return backend.grab(x, y, 1, 1)[0, 0].tolist()
+
+        assert pump(root, lambda: pixel(10, 10) == [0x83, 0x03, 0x99]), pixel(10, 10)
+        assert pixel(300, 10) == [0x11, 0xA6, 0x22]
 
         backend.move(50, 50)
         backend.button(1, True)

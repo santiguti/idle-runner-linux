@@ -2,7 +2,6 @@
 import json
 import os
 import sys
-import tkinter as tk
 from pathlib import Path
 
 import pytest
@@ -14,20 +13,17 @@ pytestmark = pytest.mark.skipif(sys.platform == "linux" and not os.environ.get("
 
 
 @pytest.fixture
-def window(tmp_path, monkeypatch):
+def window(tmp_path, monkeypatch, root):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(app_module, "latest_tag", lambda: None)  # no network in tests
     monkeypatch.setattr(GameProbe, "status", lambda self, name: ("off", "Idle Slayer isn't running"))
-    root = tk.Tk()
-    root.withdraw()
 
     def build(config_text: str = "") -> App:
         config = tmp_path / "config.toml"
         config.write_text(config_text, encoding="utf-8")
         return App(root, config)
 
-    yield build
-    root.destroy()
+    return build
 
 
 def test_the_window_builds_every_page(window) -> None:
