@@ -1,17 +1,34 @@
 name: Release
 
-# Push a tag like v2.0.0 (or v2.0.0-rc1, published as a pre-release) to build the Windows zip and attach it.
+# Push a tag like v2.0.0 (or v2.0.0-rc1, published as a pre-release) to build the Windows zip and the Linux
+# tar.gz and attach both. "Run workflow" on a branch builds them without publishing anything.
 # Only v2 and later: the Windows backend arrives in v2.0.0, so a v1.x tag stays a Linux source release.
 on:
   push:
     tags: ["v[2-9]*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+            exe: IdleRunner.exe
+            readme: packaging/README.txt
+            pyi_flags: --windowed
+          # Not ubuntu-latest: the oldest glibc (2.35) lets the binary run on more distros.
+          - os: ubuntu-22.04
+            platform: linux-x64
+            exe: IdleRunner
+            readme: packaging/README-linux.txt
+            pyi_flags: ""
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,48 +37,87 @@ jobs:
       - run: pip install -e ".[build]"
 
       # --onedir: a zip of a folder trips fewer antivirus heuristics than --onefile. Pillow turns the PNG icon
-      # into an .ico.
-      - name: Build the exe
-        run: >
-          pyinstaller --noconfirm --windowed --onedir --name IdleRunner
-          --icon idle_runner/ui/assets/icon.png --collect-data idle_runner packaging/entry.py
-
-      - name: Copy the files that ship next to the exe
+      # into an .ico. --paths: the analysis can't see the package through the editable install, and the exe
+      # would die on "No module named idle_runner.__main__".
+      - name: Build the executable
         shell: bash
-        run: cp config.example.toml LICENSE packaging/README.txt dist/IdleRunner/
+        run: >
+          pyinstaller --noconfirm ${{ matrix.pyi_flags }} --onedir --name IdleRunner
+          --icon idle_runner/ui/assets/icon.png --collect-data idle_runner --paths .
+          packaging/entry.py
 
-      # The window starts the bot as a child process of this same exe, so the frozen build must run both
-      # commands with its stdout and stderr piped.
-      - name: Smoke-test the frozen exe
+      - name: Copy the files that ship next to the executable
+        shell: bash
+        run: |
+          cp config.example.toml LICENSE dist/IdleRunner/
+          cp "${{ matrix.readme }}" dist/IdleRunner/README.txt
+          if [ "$RUNNER_OS" = "Linux" ]; then cp packaging/install.sh dist/IdleRunner/; fi
+
+      # The window starts the bot as a child process of this same executable, so the frozen build must run
+      # both commands with its stdout and stderr piped. On a tag it must also report the tag's version.
+      - name: Smoke-test the frozen executable
         shell: python
         run: |
+          import os
           import subprocess
-          exe = "dist/IdleRunner/IdleRunner.exe"
+          exe = "dist/IdleRunner/" + "${{ matrix.exe }}"
           r = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=60)
           assert "Idle Runner" in r.stdout, r
+          if os.environ["GITHUB_REF_TYPE"] == "tag":
+              assert r.stdout.strip() == "Idle Runner " + os.environ["GITHUB_REF_NAME"][1:], r
           r = subprocess.run([exe, "run", "--config", "missing.toml"], capture_output=True, text=True, timeout=60)
           assert r.returncode == 1 and "not found" in r.stdout + r.stderr, r
 
-      - name: Zip it and hash the zip
+      - name: Zip it
+        if: runner.os == 'Windows'
         shell: bash
         run: |
-          NAME="IdleRunner-${GITHUB_REF_NAME}-windows-x64"
+          NAME="IdleRunner-${GITHUB_REF_NAME}-${{ matrix.platform }}"
           (cd dist && python -m zipfile -c "../$NAME.zip" IdleRunner)
-          sha256sum "$NAME.zip" > "$NAME.zip.sha256"
           echo "ASSET=$NAME.zip" >> "$GITHUB_ENV"
+
+      # tar, not zip: it keeps the executable bit, which the grep checks on the packed file.
+      - name: Tar it
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          NAME="IdleRunner-${GITHUB_REF_NAME}-${{ matrix.platform }}"
+          tar czf "$NAME.tar.gz" -C dist IdleRunner
+          tar tvzf "$NAME.tar.gz" | grep -E '^-rwx.* IdleRunner/IdleRunner$'
+          echo "ASSET=$NAME.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Hash it
+        shell: bash
+        run: sha256sum "$ASSET" > "$ASSET.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET }}.sha256
+
+  # Only runs when every build passed, so a release never ships one platform alone.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
 
       # The release text is the tag's section of CHANGELOG.md ("## v2.0.0 (date)"), without its heading.
       - name: Release notes from CHANGELOG.md
-        shell: bash
         run: |
           awk -v tag="$GITHUB_REF_NAME" '/^## /{p = ($2 == tag); next} p' CHANGELOG.md > release-notes.md
           [ -s release-notes.md ] || echo "See CHANGELOG.md." > release-notes.md
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            ${{ env.ASSET }}
-            ${{ env.ASSET }}.sha256
+          files: assets/*
           name: Idle Runner ${{ github.ref_name }} (Windows + Linux)
           body_path: release-notes.md
           prerelease: ${{ contains(github.ref_name, '-') }}

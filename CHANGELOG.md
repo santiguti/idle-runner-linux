@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.0-rc2 (2026-10-27)
+
+### New
+- **Downloads on each release.** A Windows zip and a Linux `tar.gz` (with an `install.sh` that adds Idle Runner to the application menu), each with its SHA-256, built by GitHub Actions. No Python needed.
+
+### Fixed
+- The frozen executable crashed on start with "No module named idle_runner.__main__"; the release build now finds the package.
+
 ## v1.5.1 (2026-10-27)
 
 ### New

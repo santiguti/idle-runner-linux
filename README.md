@@ -90,9 +90,11 @@ flowchart LR
 
 ## 📦 Install
 
-On Linux you need the **Steam version of Idle Slayer for Linux** and Python 3.12 or newer (most recent distributions include it). On Windows, see *Windows* below.
+On Linux you need the **Steam version of Idle Slayer for Linux**. On Windows, see *Windows* below.
 
-**1. Install it.** The quick way, with [pipx](https://pipx.pypa.io/):
+**1. Install it.** The easiest way: download `IdleRunner-…-linux-x64.tar.gz` from [Releases](../../releases), extract it and run `./install.sh` inside the `IdleRunner` folder. That adds *Idle Runner* to your application menu (no Python needed; Ubuntu 22.04 / Fedora 36 or newer).
+
+Or, with Python 3.12 or newer and [pipx](https://pipx.pypa.io/):
 
 ```bash
 pipx install git+https://github.com/santiguti/idle-slayer-bot
@@ -138,7 +140,7 @@ py -m venv .venv
 .venv\Scripts\idle-runner
 ```
 
-From v2.0.0 on, each release also has a ready-made `IdleRunner-…-windows-x64.zip`.
+From v2.0.0 on, each [release](../../releases) also has a ready-made `IdleRunner-…-windows-x64.zip`.
 
 </details>
 
