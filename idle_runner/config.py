@@ -1,8 +1,12 @@
 """Settings, read from a TOML file (see config.example.toml)."""
 import json
 import tomllib
+from collections import Counter
 from dataclasses import dataclass, fields
 from pathlib import Path
+from typing import get_origin
+
+from idle_runner.tree_nodes import NODES, RECOMMENDED_ORDER
 
 
 @dataclass(frozen=True)
@@ -25,6 +29,8 @@ class Settings:
     post_ascend_first_buy_seconds: int = 15
     ascend_bonus_sample_minutes: float = 0
     auto_buy_tree: bool = False
+    # [tree]
+    tree_order: tuple[str, ...] = RECOMMENDED_ORDER
     # [minigames]
     skip_bonus_stage: bool = False
     no_lockpicking: bool = True
@@ -50,6 +56,7 @@ SECTIONS: dict[str, tuple[str, ...]] = {
                 "auto_buy_upgrades", "auto_buy_minutes", "auto_ascend", "auto_ascend_minutes",
                 "auto_ascend_percent", "post_ascend_first_buy_seconds", "ascend_bonus_sample_minutes",
                 "auto_buy_tree"),
+    "tree": ("tree_order",),
     "minigames": ("skip_bonus_stage", "no_lockpicking", "no_reinforced_crystal_saver", "perfect_chest_hunt"),
     "crafting": ("craft_soul_bonus", "craft_rage_pill", "craft_dimensional_staff", "craft_bidimensional_staff"),
     "debug": ("log_dir", "log_level", "save_frames", "blackbox_fps", "blackbox_minutes"),
@@ -79,6 +86,11 @@ def load_settings(path: Path) -> Settings:
         if key not in types:
             raise ValueError(f"{path}: unknown setting '{key}'")
         expected = types[key]
+        if get_origin(expected) is tuple:  # tree_order: a TOML array of strings
+            if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                raise ValueError(f"{path}: '{key}' must be a list of strings, got {value!r}")
+            values[key] = tuple(value)
+            continue
         accepted = (int, float) if expected is float else (expected,)
         # bool is a subclass of int in Python, so check it explicitly both ways.
         if isinstance(value, bool) is not (expected is bool) or not isinstance(value, accepted):
@@ -113,6 +125,10 @@ def check_ranges(path: Path, s: Settings) -> None:
         problems.append("blackbox_fps must be 0-30")
     if s.blackbox_minutes <= 0:
         problems.append("blackbox_minutes must be > 0")
+    unknown = [name for name in s.tree_order if name not in NODES]
+    if unknown:
+        problems.append("tree_order: unknown node(s): " + ", ".join(repr(name) for name in unknown))
+    problems += [f"tree_order: {name!r} is listed twice" for name, n in Counter(s.tree_order).items() if n > 1]
     if problems:
         raise ValueError(f"{path}: " + "; ".join(problems))
 
@@ -124,6 +140,9 @@ def dump_settings(s: Settings) -> str:
         lines += ["", f"[{section}]"]
         for key in keys:
             value = getattr(s, key)
+            if isinstance(value, tuple):  # one name per line
+                lines += [f"{key} = ["] + [f"    {json.dumps(item)}," for item in value] + ["]"]
+                continue
             # json.dumps writes valid TOML for these: true/false, numbers and basic strings.
             lines.append(f"{key} = {json.dumps(value)}")
     return "\n".join(lines) + "\n"

@@ -14,10 +14,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO
 
-from idle_runner.game import Backend
+from idle_runner.game import Backend, GameUnavailable, WindowGone
 from idle_runner.log import event
 from idle_runner.png import write_png
-from idle_runner.x11 import GameUnavailable, WindowGone
 
 PRUNE_EVERY_MS = 60_000
 WINDOW_RETRY_MS = 2000

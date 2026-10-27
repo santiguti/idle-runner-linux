@@ -102,6 +102,7 @@ class Shop:
         self.loop_amount = 0
         self.upgrades_bought = 0
         self.equipment_buys = 0
+        self.opened = False  # whether the last auto_upgrade got the shop open
 
     def close_if_open(self) -> None:
         """Close the shop if it's open, then wait for it to finish closing.
@@ -212,14 +213,16 @@ class Shop:
             raise BoxOnScreen
 
     def auto_upgrade(self) -> bool:
-        """AutoUpgrade. Returns False when a Random Box interrupted it (the shop is closed again)."""
+        """AutoUpgrade. Returns False when it should be retried soon: a Random Box interrupted it (the
+        shop is closed again) or the shop didn't open (e.g. a minigame's results screen still covers it)."""
         g = self.game
         event("AutoUpgrade Active")
         self.upgrades_bought = 0
         self.equipment_buys = 0
         self.close_if_open()
         completed = True
-        if self.open_shop():
+        self.opened = self.open_shop()
+        if self.opened:
             try:
                 self.buy_upgrade()
             except BoxOnScreen:
@@ -229,6 +232,7 @@ class Shop:
         else:
             event("AutoUpgrade shop not open")
             g.save_frame("shop-not-open")
+            completed = False
         event("AutoUpgrade Done", upgrades=self.upgrades_bought, equipment=self.equipment_buys,
               rounds=self.loop_amount)
         return completed

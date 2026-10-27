@@ -1,4 +1,6 @@
 """Shared minigame helpers from Libraries/Common.au3."""
+from collections.abc import Callable
+
 from idle_runner.game import STUCK_MS, Game
 
 # Where the green slider handle can be: (search left, search right, y, drag from x, drag to x).
@@ -19,14 +21,26 @@ def slider(game: Game) -> None:
             return
 
 
-def slide_until_gone(game: Game, where: str, left: int, top: int, right: int, bottom: int, color: int) -> None:
-    """`Do Slider() / Sleep(500) / Until PixelSearch(...) fails`, with a safety net."""
+def slider_showing(game: Game) -> bool:
+    """True while the green handle of "Swipe to Start" shows in one of its four places. Measured 2026-10-26:
+    in all 30 bonus stage starts recorded 2026-10-22..26 the handle is exactly 007E00 in one place, and in
+    1,100 frames of the stages themselves it never is."""
+    return any(game.pixel_search(left, y, right, y, 0x007E00) for left, right, y, _, _ in SLIDER_POSITIONS)
+
+
+def slide_until(game: Game, where: str, gone: Callable[[], bool]) -> None:
+    """`Do Slider() / Sleep(500) / Until gone()`, with a safety net."""
     deadline = game.now() + STUCK_MS
     while True:
         slider(game)
         game.sleep(500)
-        if game.pixel_search(left, top, right, bottom, color) is None:
+        if gone():
             return
         if game.now() > deadline:
             game.stuck(f"{where}.slider")
             return
+
+
+def slide_until_gone(game: Game, where: str, left: int, top: int, right: int, bottom: int, color: int) -> None:
+    """`Do Slider() / Sleep(500) / Until PixelSearch(...) fails`, with a safety net."""
+    slide_until(game, where, lambda: game.pixel_search(left, top, right, bottom, color) is None)

@@ -1,0 +1,35 @@
+name: Bug report
+description: Something the bot did wrong
+labels: [bug]
+body:
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Linux, Windows]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Idle Runner version
+      description: Shown by `idle-runner --version`, or in the window.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and when?
+      description: What you expected, what the bot did, and roughly what time (the log is in local time).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: The matching part of logs/idle_runner.log
+      render: text
+  - type: markdown
+    attributes:
+      value: |
+        Press **Mark problem** in the window (or run `idle-runner mark "what you saw"`) as soon as you notice it,
+        then attach the zipped folder from `logs/marks/`. It holds the minutes around the problem.

@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.12", "3.14"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - name: Install xvfb (the UI tests need a display)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pytest -q
+      - name: Tests (Windows)
+        if: runner.os == 'Windows'
+        run: pytest -q
+      # Task 5 of docs/superpowers/plans/2026-10-26-v2.md adds a step here for `pytest -q -m desktop` (real
+      # input on a real window) together with its test file: without one, pytest exits 5 and fails the job.

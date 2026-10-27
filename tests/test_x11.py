@@ -1,11 +1,16 @@
 import os
+import sys
 
 import pytest
-from Xlib import X, display
 
-from idle_runner.x11 import WindowGone, X11Backend
+pytest.importorskip("Xlib")
+from Xlib import X, display  # noqa: E402
 
-pytestmark = pytest.mark.skipif(not os.environ.get("DISPLAY"), reason="needs an X server")
+from idle_runner.game import WindowGone  # noqa: E402
+from idle_runner.x11 import X11Backend  # noqa: E402
+
+pytestmark = pytest.mark.skipif(sys.platform != "linux" or not os.environ.get("DISPLAY"),
+                                reason="needs Linux and an X server")
 
 
 def test_a_destroyed_window_raises_window_gone(monkeypatch) -> None:

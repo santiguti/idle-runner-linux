@@ -2,7 +2,8 @@
 
 The user's rule: start buying as soon as the counter reaches 6 coins (the sword's first level).
 After an ascension it counts up from "0" in steps like 3, 7.5, 11.3 (measured 2026-10-22), so it is
-read as a plain number. Anything else (a suffix like "Dd", a banner over it) reads as None.
+read as a plain number; after an Ultra Ascension it climbs past 1,000 within seconds, with a thousands
+comma. Anything else (a suffix like "Dd", a banner over it) reads as None.
 """
 import numpy as np
 
@@ -34,6 +35,8 @@ def read_coins(game: Game) -> float | None:
             text += "."  # a small square on the baseline
             continue
         label = _classify(glyph)
+        if label == ",":  # the thousands separator ("1,251", after the first Ultra Ascension)
+            continue
         if label is None or not label.isdigit():
             return None
         text += label

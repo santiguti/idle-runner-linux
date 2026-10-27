@@ -1,0 +1,66 @@
+name: Release
+
+# Push a tag like v2.0.0 (or v2.0.0-rc1, published as a pre-release) to build the Windows zip and attach it.
+# Only v2 and later: the Windows backend arrives in v2.0.0, so a v1.x tag stays a Linux source release.
+on:
+  push:
+    tags: ["v[2-9]*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[build]"
+
+      # --onedir: a zip of a folder trips fewer antivirus heuristics than --onefile. Pillow turns the PNG icon
+      # into an .ico.
+      - name: Build the exe
+        run: >
+          pyinstaller --noconfirm --windowed --onedir --name IdleRunner
+          --icon idle_runner/ui/assets/icon.png --collect-data idle_runner packaging/entry.py
+
+      - name: Copy the files that ship next to the exe
+        shell: bash
+        run: cp config.example.toml LICENSE packaging/README.txt dist/IdleRunner/
+
+      # The window starts the bot as a child process of this same exe, so the frozen build must run both
+      # commands with its stdout and stderr piped.
+      - name: Smoke-test the frozen exe
+        shell: python
+        run: |
+          import subprocess
+          exe = "dist/IdleRunner/IdleRunner.exe"
+          r = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=60)
+          assert "Idle Runner" in r.stdout, r
+          r = subprocess.run([exe, "run", "--config", "missing.toml"], capture_output=True, text=True, timeout=60)
+          assert r.returncode == 1 and "not found" in r.stdout + r.stderr, r
+
+      - name: Zip it and hash the zip
+        shell: bash
+        run: |
+          NAME="IdleRunner-${GITHUB_REF_NAME}-windows-x64"
+          (cd dist && python -m zipfile -c "../$NAME.zip" IdleRunner)
+          sha256sum "$NAME.zip" > "$NAME.zip.sha256"
+          echo "ASSET=$NAME.zip" >> "$GITHUB_ENV"
+
+      # The release text is the tag's section of CHANGELOG.md ("## v2.0.0 (date)"), without its heading.
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          awk -v tag="$GITHUB_REF_NAME" '/^## /{p = ($2 == tag); next} p' CHANGELOG.md > release-notes.md
+          [ -s release-notes.md ] || echo "See CHANGELOG.md." > release-notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET }}.sha256
+          body_path: release-notes.md
+          prerelease: ${{ contains(github.ref_name, '-') }}

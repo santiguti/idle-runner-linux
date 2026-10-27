@@ -1,5 +1,6 @@
 """Command line entry point: python -m idle_runner <command>."""
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -7,20 +8,21 @@ from pathlib import Path
 
 import numpy as np
 
+from idle_runner import __version__
 from idle_runner.blackbox import BlackBox, mark
 from idle_runner.png import write_png
+from idle_runner.process import self_command
 from idle_runner.config import Settings, load_settings
-from idle_runner.game import Game
+from idle_runner.game import Game, GameUnavailable, open_backend
 from idle_runner.log import setup_logging
 from idle_runner.repeater import Repeater
 from idle_runner.runner import Runner, install_stop_signals
 from idle_runner.stats import summarize
-from idle_runner.x11 import GameUnavailable, X11Backend
 
 
 def run_probe(args: argparse.Namespace) -> int:
     """Calibration/debugging: window info, colours, timings, a screenshot and manual input tests."""
-    backend = X11Backend(args.name)
+    backend = open_backend(args.name)
     if args.delay:
         print(f"waiting {args.delay:g} s: focus the game window now...")
         time.sleep(args.delay)
@@ -89,14 +91,14 @@ def run_bot(config_path: Path) -> int:
         return 1
     log_dir = Path(settings.log_dir)
     setup_logging(log_dir, settings.log_level)
-    backend = X11Backend(settings.window_name)
+    backend = open_backend(settings.window_name)
     game = Game(backend, (settings.offset_x, settings.offset_y), settings.color_tolerance,
                 log_dir / "frames" if settings.save_frames else None)
     jumper = Repeater(game, ("Up", "Right"), settings.jump_interval_ms, "jumper")
     install_stop_signals()
     recorder = None
     if settings.blackbox_fps:
-        recorder = subprocess.Popen([sys.executable, "-m", "idle_runner", "blackbox", "--config", str(config_path)])
+        recorder = subprocess.Popen(self_command("blackbox", "--config", str(config_path)))
     try:
         Runner(game, settings, jumper).run()
     finally:
@@ -113,7 +115,7 @@ def run_blackbox(config_path: Path) -> int:
         print("error: the black box is off (blackbox_fps = 0)", file=sys.stderr)
         return 1
     install_stop_signals()
-    box = BlackBox(X11Backend(settings.window_name), Path(settings.log_dir), settings.blackbox_minutes)
+    box = BlackBox(open_backend(settings.window_name), Path(settings.log_dir), settings.blackbox_minutes)
     try:
         box.run(settings.blackbox_fps)
     except KeyboardInterrupt:  # Ctrl+C reaches the bot and its black box alike
@@ -121,12 +123,26 @@ def run_blackbox(config_path: Path) -> int:
     return 0
 
 
+def prepare_frozen_process() -> None:
+    """A PyInstaller exe works from its own folder (config.toml and logs/ live there) and, built
+    windowed, has no stdout/stderr to print to."""
+    if not getattr(sys, "frozen", False):
+        return
+    os.chdir(Path(sys.executable).parent)
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m idle_runner")
-    sub = parser.add_subparsers(dest="command", required=True)
+    prepare_frozen_process()
+    parser = argparse.ArgumentParser(prog="idle-runner")
+    parser.add_argument("--version", action="version", version=f"Idle Runner {__version__}")
+    sub = parser.add_subparsers(dest="command")
 
     probe = sub.add_parser("probe", help="inspect the game window (calibration and debugging)")
-    probe.add_argument("--name", default="Idle Slayer", help="X11 window title")
+    probe.add_argument("--name", default="Idle Slayer", help="game window title")
     probe.add_argument("--delay", type=float, default=0, help="seconds to wait first (time to focus the game)")
     probe.add_argument("--out", type=Path, default=Path("probe.png"), help="where to save the screenshot")
     probe.add_argument("--pixel", type=int, nargs=2, metavar=("X", "Y"), help="print the colour at client X Y")
@@ -152,7 +168,10 @@ def main(argv: list[str] | None = None) -> int:
     mark_cmd.add_argument("--minutes", type=float, default=5, help="how much of the recording to keep")
     mark_cmd.add_argument("--log-dir", type=Path, default=Path("logs"))
 
-    args = parser.parse_args(argv)
+    argv = sys.argv[1:] if argv is None else argv
+    args = parser.parse_args(argv or ["gui"])  # no arguments at all: open the window
+    if args.command is None:
+        parser.error("a command is required")
     try:
         if args.command == "probe":
             return run_probe(args)

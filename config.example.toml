@@ -27,8 +27,18 @@ post_ascend_first_buy_seconds = 15       # after ascending, buy this soon, then 
                                          # auto_buy_minutes (0 = original behaviour)
 ascend_bonus_sample_minutes = 0          # read the Ascend button's "+X% CpS bonus" this often and log it
                                          # (0 = off)
-auto_buy_tree = false                    # buy Ascension Tree nodes (spends SP) in the order listed in
-                                         # idle_runner/tree.py: at start and after each ascension
+auto_buy_tree = false                    # buy Ascension Tree nodes (spends SP) in the order of tree_order:
+                                         # at start and after each ascension
+
+[tree]
+# Nodes the bot buys, in this order. Omitted = the recommended order (the wiki's, 110 nodes: see
+# RECOMMENDED_ORDER in idle_runner/tree_nodes.py, which also lists every valid name). A node that isn't
+# listed is never bought; a node you own already costs under a second to skip. Example:
+# tree_order = [
+#     "Village Key",
+#     "Idle Earrings I",
+#     "Portals",
+# ]
 
 [minigames]
 skip_bonus_stage = false                 # don't play bonus stages, wait for them to end

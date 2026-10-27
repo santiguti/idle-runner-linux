@@ -1,10 +1,11 @@
-"""AutoIt-compatible facade over the X11 backend.
+"""AutoIt-compatible facade over the platform backend (X11 or Win32).
 
 Every coordinate given to `Game` is an *AutoIt coordinate*, copied verbatim from the original
 Idle Runner: relative to the game window's top-left corner *including* the Windows title bar
 and borders (`Opt("PixelCoordMode", 0)` / `Opt("MouseCoordMode", 0)`). `offset` converts them
 to client-area pixels, so each line of the port stays traceable to the AutoIt source.
 """
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
@@ -15,7 +16,6 @@ import numpy as np
 
 from idle_runner.log import event, inputs, log
 from idle_runner.png import write_png
-from idle_runner.x11 import GameUnavailable
 
 Point = tuple[int, int]
 
@@ -24,8 +24,16 @@ LEFT, WHEEL_UP, WHEEL_DOWN = 1, 4, 5
 HELD_KEYS = ("Up", "Right", "a", "d", "r")  # every key the bot ever presses
 
 
+class GameUnavailable(Exception):
+    """The game window can't be used right now (not focused, minimized or gone)."""
+
+
+class WindowGone(GameUnavailable):
+    """The game window was destroyed (e.g. the game was closed or restarted); find it again by name."""
+
+
 class Backend(Protocol):
-    """What Game needs from the outside world: X11Backend in production, FakeBackend in tests."""
+    """What Game needs from the outside world: X11Backend or Win32Backend in production, FakeBackend in tests."""
 
     def find_window(self) -> None: ...
     def size(self) -> tuple[int, int]: ...
@@ -36,6 +44,15 @@ class Backend(Protocol):
     def key(self, name: str, down: bool) -> None: ...
     def now_ms(self) -> float: ...
     def sleep_ms(self, ms: float) -> None: ...
+
+
+def open_backend(window_name: str) -> Backend:
+    """The backend of this platform (imported lazily: python-xlib only exists on Linux)."""
+    if sys.platform == "win32":
+        from idle_runner.win32 import Win32Backend
+        return Win32Backend(window_name)
+    from idle_runner.x11 import X11Backend
+    return X11Backend(window_name)
 
 
 class Game:

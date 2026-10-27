@@ -11,13 +11,7 @@ from Xlib import X, XK, display, error
 from Xlib.ext import xtest
 from Xlib.xobject.drawable import Window
 
-
-class GameUnavailable(Exception):
-    """The game window can't be used right now (not focused, minimized or gone)."""
-
-
-class WindowGone(GameUnavailable):
-    """The game window was destroyed (e.g. the game was closed or restarted); find it again by name."""
+from idle_runner.game import GameUnavailable, WindowGone
 
 
 class X11Backend:

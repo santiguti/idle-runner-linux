@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="Idle Runner for Linux" width="100%">
+  <img src="docs/images/banner.svg" alt="Idle Runner, an Idle Slayer bot" width="100%">
 </p>
 
 <p align="center">
@@ -8,7 +8,9 @@
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab">
 </p>
 
-**Idle Runner for Linux** plays [Idle Slayer](https://store.steampowered.com/app/1353300/Idle_Slayer/) for you on Linux. It jumps, collects boxes, buys upgrades, plays the minigames, ascends when it's worth it and spends your Slayer Points on the Ascension Tree.
+# Idle Runner
+
+**An Idle Slayer bot for Linux** (Windows support is in progress). It plays [Idle Slayer](https://store.steampowered.com/app/1353300/Idle_Slayer/) for you on Linux. It jumps, collects boxes, buys upgrades, plays the minigames, ascends when it's worth it and spends your Slayer Points on the Ascension Tree.
 
 It only **looks at the game window and presses keys**, the same way you would. It never touches the game's memory, files or saves.
 
@@ -22,7 +24,7 @@ It only **looks at the game window and presses keys**, the same way you would. I
 | | |
 |---|---|
 | 🏃 **Runs** | Jumps and boosts nonstop, at the rate you choose. |
-| 🎁 **Collects** | Silver boxes, minions and the daily bonus. |
+| 🎁 **Collects** | Silver and orange boxes, minions and the daily bonus. |
 | 🛒 **Buys** | Upgrades and equipment every few minutes, and claims quest rewards. Right after an ascension it buys as soon as you have 6 coins, then slows down gradually. |
 | 🌀 **Travels** | Takes portals, cycling through the zones if you want. |
 | 😡 **Rages** | Uses rage at Megahordes, optionally only with Soul Bonus. |
@@ -51,18 +53,25 @@ It only **looks at the game window and presses keys**, the same way you would. I
 - An unexpected error is logged with its traceback and the bot keeps going; it stops after 5 errors in a row. Loops that could hang forever give up after a timeout and log a `stuck` event with a screenshot.
 - The jumper pauses as soon as a menu routine starts.
 - Clicks outside the game window are refused.
-- **Shop:** every tab click is checked before buying, so a click meant for one tab can't land on another (e.g. "Max" in Equipment is "Buy all available" in Upgrades). The shop is closed only while it shows, and the bot waits for it to finish closing: a second click while it closes leaves an empty panel that blocks every later click.
+- **Shop:** every tab click is checked before buying, so a click meant for one tab can't land on another (e.g. "Max" in Equipment is "Buy all available" in Upgrades). If the shop doesn't open (e.g. a minigame's results screen still covers it), it tries again 15 s later. The shop is closed only while it shows, and the bot waits for it to finish closing: a second click while it closes leaves an empty panel that blocks every later click.
 - **Quests:** blue event-quest rows are skipped while their button is the grey "Quest Reward", and bought once claimed. Without a Quests tab (after an Ultra Ascension, until quests are unlocked again) it doesn't claim, so it never opens the Jewels shop by mistake.
-- **Random Box:** if a silver box shows up while shopping, the bot stops, lets the jumper grab it and buys again shortly after.
+- **Random Box:** if a silver or orange box shows up while shopping, the bot stops, lets the jumper grab it and buys again shortly after.
 - **After an ascension:** the coin counter is read, and the bot buys as soon as it shows 6 coins (the sword's first level), by the bot's ascension or yours. Then buying restarts at `post_ascend_first_buy_seconds` (default 15 s) and the wait doubles up to `auto_buy_minutes`.
 - **Ascend by %:** every `ascend_bonus_sample_minutes` the bot opens the Ascension tab and reads the button's "+X% CpS bonus" (SP gained by ascending ÷ SP earned so far). With `auto_ascend_percent` set, it ascends at the first reading that reaches it; `auto_ascend_minutes` stays as the cap. A bonus it can't read is logged with a screenshot, never guessed.
-- **Ascension Tree:** with `auto_buy_tree`, the bot zooms the tree all the way out (where every node has a fixed place), then clicks the nodes in the order of `ORDER` in [`idle_runner/tree.py`](idle_runner/tree.py). Bought nodes are skipped; it stops at the first node it can't buy. It runs at start, after each ascension by the bot, and after one by hand. Restart the bot after an Ultra Ascension by hand.
+- **Ascension Tree:** with `auto_buy_tree`, the bot zooms the tree all the way out (where every node has a fixed place), then clicks the nodes in the order of `tree_order` (see Settings). Bought nodes are skipped; it stops at the first node it can't buy. It runs at start, after each ascension by the bot, and after one by hand. Restart the bot after an Ultra Ascension by hand.
 - **Minions:** claimed only when the Minions tab really shows, so the claim clicks never land in the tree.
 - One-shot crafts (Dimensional/Bidimensional staff) apply once per run. The portal rotation restarts from `circle_portals_count`.
 - Bonus-stage sync markers that never show up are logged as `Sync timeout` events with a screenshot.
 - The Knight boss fight is disabled.
 
 </details>
+
+## 🔒 Safety
+
+- It only reads pixels from the game window and sends keys and mouse clicks. It never reads or changes the game's memory, files or network traffic.
+- It never spends jewels (they cost real money): it presses Buy in the Ascension Tree only when the game shows enough Slayer Points, and closes any jewel offer.
+- It never Ultra Ascends.
+- Ascending and tree buying are off until you turn them on.
 
 ## 🧠 How it works
 
@@ -79,28 +88,30 @@ flowchart LR
 
 You need the **Steam version of Idle Slayer for Linux** and Python 3.12 or newer (most recent distributions include it).
 
-**1. Download the bot.** Get the latest version from [Releases](../../releases) and unzip it, or clone it:
+**1. Install it.** The quick way, with [pipx](https://pipx.pypa.io/):
 
 ```bash
-git clone https://github.com/santiguti/idle-runner-linux.git
-cd idle-runner-linux
+pipx install git+https://github.com/santiguti/idle-slayer-bot
+idle-runner            # opens the window
 ```
 
-**2. Install it** (once):
+Or from a clone, in a virtual environment:
 
 ```bash
+git clone https://github.com/santiguti/idle-slayer-bot.git
+cd idle-slayer-bot
 python3 -m venv .venv
 .venv/bin/pip install -e .
 ```
 
-**3. Set up the game:**
+**2. Set up the game:**
 - Windowed, **1280x720**, in **English**.
 - Keybinds: jump = **Up arrow**, boost = **Right arrow**.
 - Disable the custom cursor and the portal dialogue.
 - Enable *rounded bulk* and *hide locked quest rewards*.
 - Don't buy the **Vertical Magnet**.
 
-**4. Start it:**
+**3. Start it:**
 
 ```bash
 .venv/bin/python -m idle_runner gui
@@ -135,7 +146,7 @@ The first time the bot presses a key, KDE Plasma on Wayland asks whether to allo
 
 Every setting is in the bot's window. You can also copy `config.example.toml` to `config.toml` and edit it. Each line is explained in the file.
 
-To ascend by percentage, set both `ascend_bonus_sample_minutes` (how often the bonus is read, e.g. 5) and `auto_ascend_percent`. To change which tree nodes are bought, and in what order, edit `ORDER` in [`idle_runner/tree.py`](idle_runner/tree.py).
+To ascend by percentage, set both `ascend_bonus_sample_minutes` (how often the bonus is read, e.g. 5) and `auto_ascend_percent`. To change which tree nodes are bought, and in what order, list them under `tree_order` in the `[tree]` section of `config.toml` (every valid name is in [`idle_runner/tree_nodes.py`](idle_runner/tree_nodes.py)). Without it, the bot uses the recommended order.
 
 ---
 

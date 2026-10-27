@@ -1,4 +1,3 @@
-import os
 import signal
 import time
 from dataclasses import replace
@@ -12,7 +11,7 @@ from idle_runner.game import Game
 from idle_runner.log import log
 from idle_runner.runner import (BOX_RETRY_MS, MAX_CONSECUTIVE_CRASHES, SIX_COIN_TIMEOUT_MS, WINDOW_RETRY_MS, Runner,
                                  install_stop_signals)
-from idle_runner.x11 import GameUnavailable, WindowGone
+from idle_runner.game import GameUnavailable, WindowGone
 from tests.fakes import OFFSET, FakeBackend
 
 
@@ -292,11 +291,12 @@ def test_run_releases_keys_even_if_stopping_the_jumper_is_interrupted(game, fake
 
 
 def test_stop_signals_raise_keyboard_interrupt() -> None:
-    previous = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGHUP)}
+    signals = [s for s in (signal.SIGTERM, getattr(signal, "SIGHUP", None), getattr(signal, "SIGBREAK", None)) if s]
+    previous = {s: signal.getsignal(s) for s in signals}
     try:
         install_stop_signals()
         with pytest.raises(KeyboardInterrupt):
-            os.kill(os.getpid(), signal.SIGTERM)
+            signal.raise_signal(signal.SIGTERM)  # os.kill(own pid, SIGTERM) on Windows ends pytest at once
             time.sleep(1)  # the handler runs between bytecodes
     finally:
         for sig, handler in previous.items():
@@ -454,6 +454,43 @@ def test_six_coin_buy_falls_back_after_two_minutes_of_unreadable_counter(game, f
 
     assert event_names().count("Coins reading timed out") == 1
     assert buys and SIX_COIN_TIMEOUT_MS <= buys[0] < SIX_COIN_TIMEOUT_MS + 5_000  # later buys: the ramp
+
+
+def test_shop_not_open_retries_in_15_s(game, fake, jumper, event_names) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True, auto_buy_minutes=10), jumper)
+
+    runner.buy()  # nothing is painted: the shop never opens
+
+    assert "AutoUpgrade shop not open" in event_names()
+    assert runner.retry_buy_at is not None and runner.retry_buy_at <= fake.t + BOX_RETRY_MS
+
+
+def test_shop_not_open_is_retried_only_once(game, fake, jumper, event_names) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True, auto_buy_minutes=10), jumper)
+    runner.buy()  # nothing is painted: the shop never opens
+    fake.t = runner.retry_buy_at
+
+    runner.buy()  # the retry, as tick() runs it: the shop still doesn't open
+
+    assert event_names().count("AutoUpgrade shop not open") == 2
+    assert runner.retry_buy_at is None  # back to the normal timer (a stuck panel once lasted 55 minutes)
+
+
+def test_a_box_during_the_retry_is_retried_again(game, fake, jumper, monkeypatch) -> None:
+    runner = Runner(game, replace(Settings(), auto_buy_upgrades=True, auto_buy_minutes=10), jumper)
+
+    def stopped_by_a_box() -> bool:
+        runner.shop.opened = True
+        return False
+
+    monkeypatch.setattr(runner.shop, "auto_upgrade", stopped_by_a_box)
+    runner.buy()
+    first_retry = runner.retry_buy_at
+    fake.t = first_retry
+
+    runner.buy()
+
+    assert runner.retry_buy_at is not None and runner.retry_buy_at > first_retry
 
 
 def test_buying_resumes_soon_after_a_box_interrupts_it(game, fake, jumper, event_names, monkeypatch) -> None:

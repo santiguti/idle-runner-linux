@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from idle_runner.config import SECTIONS, Settings, dump_settings, load_settings
+from idle_runner.tree_nodes import RECOMMENDED_ORDER
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "config.example.toml"
 
@@ -96,3 +97,50 @@ def test_dump_settings_round_trips(tmp_path) -> None:
                         jump_interval_ms=120, blackbox_fps=0)
 
     assert load_settings(write(tmp_path, dump_settings(settings))) == settings
+
+
+V1_CONFIG = ("[game]\nwindow_name = \"Idle Slayer\"\n[general]\nauto_buy_tree = true\n"
+             "[minigames]\nperfect_chest_hunt = true\n")
+
+
+def test_v1_config_loads_with_the_recommended_order(tmp_path) -> None:
+    assert load_settings(write(tmp_path, V1_CONFIG)).tree_order == RECOMMENDED_ORDER
+
+
+def test_custom_tree_order_round_trips(tmp_path) -> None:
+    settings = Settings(tree_order=("Doesn't Matter to Me", "Portals"))
+    text = dump_settings(settings)
+
+    assert '[tree]\ntree_order = [\n    "Doesn\'t Matter to Me",\n    "Portals",\n]\n' in text
+    assert load_settings(write(tmp_path, text)).tree_order == settings.tree_order
+
+
+def test_an_empty_tree_order_is_allowed(tmp_path) -> None:
+    assert load_settings(write(tmp_path, "[tree]\ntree_order = []\n")).tree_order == ()
+
+
+def test_unknown_tree_node_is_an_error(tmp_path) -> None:
+    with pytest.raises(ValueError, match="tree_order: unknown node.*'Moon Boots'"):
+        load_settings(write(tmp_path, '[tree]\ntree_order = ["Portals", "Moon Boots"]\n'))
+
+
+def test_duplicate_tree_node_is_an_error(tmp_path) -> None:
+    with pytest.raises(ValueError, match="tree_order: 'Portals' is listed twice"):
+        load_settings(write(tmp_path, '[tree]\ntree_order = ["Portals", "Green Ore", "Portals"]\n'))
+
+
+def test_tree_order_must_be_a_list_of_strings(tmp_path) -> None:
+    with pytest.raises(ValueError, match="'tree_order' must be a list of strings"):
+        load_settings(write(tmp_path, '[tree]\ntree_order = "Portals"\n'))
+    with pytest.raises(ValueError, match="'tree_order' must be a list of strings"):
+        load_settings(write(tmp_path, "[tree]\ntree_order = [1, 2]\n"))
+
+
+def test_an_array_for_any_other_setting_is_a_type_error(tmp_path) -> None:
+    with pytest.raises(ValueError, match="'jump_interval_ms' must be int"):
+        load_settings(write(tmp_path, "[general]\njump_interval_ms = [1]\n"))
+
+
+def test_tree_order_belongs_in_the_tree_section(tmp_path) -> None:
+    with pytest.raises(ValueError, match=r"'tree_order' belongs in \[tree\], not \[general\]"):
+        load_settings(write(tmp_path, '[general]\ntree_order = ["Portals"]\n'))

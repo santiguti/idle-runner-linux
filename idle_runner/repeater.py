@@ -7,9 +7,8 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from idle_runner.game import Game
+from idle_runner.game import Game, GameUnavailable
 from idle_runner.log import event, log
-from idle_runner.x11 import GameUnavailable
 
 
 class Repeater:

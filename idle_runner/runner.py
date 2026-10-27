@@ -17,7 +17,7 @@ from idle_runner.portals import portal_ready, take_portal
 from idle_runner.repeater import Repeater
 from idle_runner.shop import Shop
 from idle_runner.tree import Tree
-from idle_runner.x11 import GameUnavailable, WindowGone
+from idle_runner.game import GameUnavailable, WindowGone
 
 EXPECTED_SIZE = (1280, 720)
 WINDOW_RETRY_MS = 2000  # how often to look for the game window again after it is gone
@@ -27,10 +27,11 @@ MAX_CONSECUTIVE_CRASHES = 5  # unexpected errors in a row before giving up (e.g.
 
 
 def install_stop_signals() -> None:
-    """Make `kill` (SIGTERM) and closing the terminal (SIGHUP) stop the bot like Ctrl+C,
-    so the shutdown path still releases every held key."""
-    for sig in (signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, signal.default_int_handler)
+    """Make `kill` (SIGTERM), closing the terminal (SIGHUP) and, on Windows, Ctrl+Break stop the
+    bot like Ctrl+C, so the shutdown path still releases every held key."""
+    for name in ("SIGTERM", "SIGHUP", "SIGBREAK"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), signal.default_int_handler)
 
 
 class Runner:
@@ -39,7 +40,7 @@ class Runner:
         self.s = settings
         self.jumper = jumper
         self.shop = Shop(game)
-        self.tree = Tree(game)
+        self.tree = Tree(game, settings.tree_order)
         self.tree_due = settings.auto_buy_tree  # once at start: the user may have ascended by hand
         now = game.now()
         self.last_slow = now
@@ -54,7 +55,7 @@ class Runner:
         self.paused_reason: str | None = None
         self.unavailable_reason: str | None = None  # last GameUnavailable, until a tick completes
         self.coins_low_since: float | None = None  # when the counter last read under 6 (after an ascension)
-        self.retry_buy_at: float | None = None  # set when a Random Box stopped a buy
+        self.retry_buy_at: float | None = None  # set when a Random Box stopped a buy or the shop did not open
 
     def run(self) -> None:
         g = self.game
@@ -198,11 +199,15 @@ class Runner:
                 self._routine("buy_tree", self.tree.buy)
 
     def buy(self) -> None:
-        """AutoUpgrade; if a Random Box stopped it, buy again in BOX_RETRY_MS (after the jumper got the
-        box and any minigame it started is over: minigames run as routines in between)."""
+        """AutoUpgrade; if a Random Box stopped it or the shop didn't open, buy again in BOX_RETRY_MS
+        (after the jumper got the box and any minigame it started is over: minigames run as routines
+        in between). A shop that doesn't open is retried once, then the normal timer takes over: on
+        2026-10-24 a stuck panel kept it shut for 55 minutes."""
         self.shop.loop_amount = 0
+        retrying = self.retry_buy_at is not None  # tick() leaves it set while it runs the retry
         completed = self._routine("auto_upgrade", self.shop.auto_upgrade)
-        self.retry_buy_at = None if completed else self.game.now() + BOX_RETRY_MS
+        again = not completed and (self.shop.opened or not retrying)
+        self.retry_buy_at = self.game.now() + BOX_RETRY_MS if again else None
 
     def buy_at_six_coins(self) -> None:
         """Not in the original (user's rule, 2026-10-22): after an ascension, by the bot or by hand,

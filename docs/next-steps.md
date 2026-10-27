@@ -1,5 +1,12 @@
 # Next steps (handoff of 2026-10-22)
 
+**2026-10-26: everything below is now planned in `docs/superpowers/plans/2026-10-26-v2.md`** (Windows + rename + new
+window first, then these items as tasks B1-B12). Log review of 10-26 (01:03-20:10), details in the plan's Phase 4:
+ascend by % worked live 7 times (item closed); every bonus stage since the UA is not BS2 (likely Bonus Stage 1, the
+5,000 SP node isn't rebought) and timed out; both "Tree jewel offer closed" were successful SP purchases (false
+positive, nothing spent); 7 of 21 "Shop click retried" are the AutoUpgrade right after ascending, when the shop
+button doesn't exist yet.
+
 212 tests pass (`.venv/bin/python -m pytest -q`; 2026-10-26). Nothing is committed. A live session of about 90 minutes (auto-buy every minute, no auto-ascend) ended clean. Buying, claiming, Second Wind, restarting the game and the first-round equipment buy all worked live. The user wants every item fixed **correctly, without guessing**: if an item lacks data, measure first.
 
 ## Log review of 2026-10-25 (last run: 2026-10-23 19:15 – 10-24 00:14, about 5 h)
@@ -160,7 +167,7 @@
     `auto_ascend_minutes` stays as the cap. It needs `ascend_bonus_sample_minutes > 0`.
   - Post-UA curve: 0% → 3% (23:06) → 15% (23:11) → 19% (23:16).
 - **Coin reader** after the UA: the counter shows "1,027", "4,489"; it read 7.0 / 6.0 and fired
-  "Coins reached 6" every ~10 min. The comma isn't a glyph yet (extra buys only, harmless).
+  "Coins reached 6" every ~10 min. **FIXED 2026-10-26 (v1.2.1):** the comma and the 9 are glyphs now.
 - **Minions Collect** fired 90 times in 20:21–23:18 (pre-UA), often 3–7 s apart: the (99, 113) trigger
   stays on after the routine. No frames kept (the black box only holds 23:13+). Irrelevant until the
   Minions node (1,200 SP) is rebought.
@@ -252,10 +259,12 @@ routine with verified waits.
 
 ## 1. Pending, in priority order
 
-1. **Six-coin buy (E): VERIFIED LIVE 2026-10-23 19:33** — one ascension by the bot's routine (user's OK); counter read 0, then "Coins reached 6" at 7.5 (8.7 s after the bot started) → AutoUpgrade → the sword was the first buy (Lv 55 a second later), then 143 upgrades + 130 equipment in 6 rounds. Remaining: add the digit-9 samples. Original item: It needs an ascension, so ask first. Expect "Coins reached 6" right after the counter passes 6, then an equipment buy. No sample of the digit "9" exists yet, so it reads as unknown. Save one when it shows up and add it to `idle_runner/coin_glyphs.py`.
+1. **Six-coin buy (E): VERIFIED LIVE 2026-10-23 19:33** — one ascension by the bot's routine (user's OK); counter read 0, then "Coins reached 6" at 7.5 (8.7 s after the bot started) → AutoUpgrade → the sword was the first buy (Lv 55 a second later), then 143 upgrades + 130 equipment in 6 rounds. Digit 9: DONE 2026-10-26 (v1.2.1). Original item: It needs an ascension, so ask first. Expect "Coins reached 6" right after the counter passes 6, then an equipment buy. No sample of the digit "9" exists yet, so it reads as unknown. Save one when it shows up and add it to `idle_runner/coin_glyphs.py`.
 2. **Lost clicks.** Sometimes a click never reaches the game: the shop stayed closed for 2.3 s with nothing in the way. The 2026-10-21 keyboard test also lost its first press. `open_shop`/`select_tab` now retry once and log "Shop click retried". Count those in the next run. If they are frequent, investigate the XTEST → XWayland/libei path; the cause is unknown.
 3. **Bonus Stage 2 (C9).**
-   - (a) The "Swipe to Start" retry never fires. The original retries while (775, 448) is white, but that pixel is 141416 on this version even with the dialog up. Measure a reliable "dialog still showing" pixel in `bonus-stage-2/` (the green slider, 007E00 at (443, 620), is a candidate).
+   - (a) **DONE 2026-10-26 (v1.2.1):** the retry runs while the green handle (007E00) shows in any of the
+     four places `slider()` knows (30 of 30 recorded starts; (443, 620) is only its bottom-left place).
+     Was: the "Swipe to Start" retry never fires. The original retries while (775, 448) is white, but that pixel is 141416 on this version even with the dialog up. Measure a reliable "dialog still showing" pixel in `bonus-stage-2/` (the green slider, 007E00 at (443, 620), is a candidate).
    - (b) The intro got longer: after the swipe, "Golden Invasion appeared!" plus about 10 s of walking before "Go!". The first section's sync (CFBCB8 at (220, 465)) then has to arrive within its 15 s window. In one of two runs it timed out. Calibrate from more recordings.
    - (c) Hold timings (C9 proper): calibrate with `Sync timeout` events and frames from real runs.
 3b. **2026-10-23 findings (live).**
@@ -265,15 +274,16 @@ routine with verified waits.
      - (ii) the list is misaligned after scrolling, so the 72 px exclusion box misses the icon.
 
      Fix in progress: before each click, find the real row around the click point by its black separators (x=1180) and check the exclusion colours over that whole row (no click if a separator isn't visible). After each click, wait until that row actually changes.
-   - **Floating silver Random Box** (from the top-centre bonus, 5 in a row): slate frame 5F6D95 (117–508 px; other objects ≤ 52), about 41 px square, flies in from the right, then hovers over the player (x 125–166, y 276–317) for about 3 s until hit. While the bot shopped, the jumper was paused, so the box was lost. Fired live once (20:43:56): the buy stopped after 6 equipment and the retry 17 s later bought 9 more; whether the jumper got the box wasn't recorded (the shop recorder only captures the panel). Implementation: `actions.box_on_screen` and `Shop.stop_for_box` stop the buy, close the shop and log "Shopping stopped for a Random Box"; `Runner.buy` retries 15 s later. Orange boxes: no sample yet (`logs/recordings/2026-10-23-boxes/` has a 15 min play-area recording to scan). With the Vertical Magnet the box adjusts its height, which breaks blind jumping (user); jumping by box position would be needed.
+   - **Floating silver Random Box** (from the top-centre bonus, 5 in a row): slate frame 5F6D95 (117–508 px; other objects ≤ 52), about 41 px square, flies in from the right, then hovers over the player (x 125–166, y 276–317) for about 3 s until hit. While the bot shopped, the jumper was paused, so the box was lost. Fired live once (20:43:56): the buy stopped after 6 equipment and the retry 17 s later bought 9 more; whether the jumper got the box wasn't recorded (the shop recorder only captures the panel). Implementation: `actions.box_on_screen` and `Shop.stop_for_box` stop the buy, close the shop and log "Shopping stopped for a Random Box"; `Runner.buy` retries 15 s later. **Orange box (sword icon): DONE 2026-10-26** (B7): frame DF7126 (599–817 px full, 104 entering, 0 in the 145-frame-free rest of the 900), `actions.box_on_screen` checks it too; that recording holds orange boxes only, no silver one, and the orange box's sword has 51 slate pixels (below the silver threshold of 100). With the Vertical Magnet the box adjusts its height, which breaks blind jumping (user); jumping by box position would be needed.
    - **BS2 played live** by the bot's routine (`logs/recordings/2026-10-23-bs2`, 5 fps):
      - Second Wind was taken ("BonusStage2 Retry").
      - The sync timed out in s1 (twice), s2 and s3; all 4 sections then "completed" unsynchronized.
      - S1 cause, measured: the player runs into the first block and stops before the bot acts. The block's light edge (CFBCB8, 3–4 px wide, on y=465) came to rest at x 162–165 / 178–181 / 240–242 today and at 204–207 / **220–223** on 2026-10-22, so the single pixel (220, 465) matched only on 10-22. DONE 2026-10-23 (test with the 3 measured rest positions; a third live run also stopped at 162-181): `S1_SYNC` now spans x 151-220 on y=465, the span the original uses for the same block in section 3. Reading of the 3 runs: the exact colour CFBCB8 only shows while the block stands still. **Verified live 19:57–21:05: 5 BS2 runs, zero sync timeouts**; 4 finished all 4 sections, 1 ended by a focus loss; Second Wind was taken 3 times.
      - S2 (BB26DF, a 400 px platform) never appeared while it waited (the stage was already out of step).
    - **Post-ascension claim trigger**: right after the ascension the shop button glowed, but the Quests tab didn't (nothing to claim). The glow isn't only quests. One wasted claim was seen; watch for repeats and gate on the in-shop Quests tab glow if they happen.
-   - **Digit 9** samples found (69.5, 109, 209, 390); add them to `coin_glyphs.py`.
-3c. **Buy right after a minigame** (minor, live 2026-10-23): when the buy timer runs out during a bonus stage, the buy fires as soon as it ends, while the results screen still covers the shop. It retries the click, then logs "AutoUpgrade shop not open" (3.4 s lost, 5 times in 70 min); the next minute's buy works.
+   - **Digit 9**: DONE 2026-10-26 (v1.2.1), from 7 frames, plus the thousands comma.
+3c. **Buy right after a minigame** (DONE 2026-10-26, v1.2.1: a shop that didn't open is retried once after
+   15 s) (minor, live 2026-10-23): when the buy timer runs out during a bonus stage, the buy fires as soon as it ends, while the results screen still covers the shop. It retries the click, then logs "AutoUpgrade shop not open" (3.4 s lost, 5 times in 70 min); the next minute's buy works.
 4. **Claim loop clicks the same button 2–3 times** about 21 ms apart: the original doesn't pause after a click. Harmless, but each click logs "Quest Claimed". Fix: after clicking, wait until that pixel stops being green (short cap).
 5. **C8, click guard.** Measured with the pointer over different windows:
    - Over the game, `root.query_pointer().child` is the game's client window (no frame).
@@ -330,7 +340,7 @@ routine with verified waits.
 | Shop button glow (1130, 610) | pulses 989898 → CFCF46 when a quest can be claimed |
 | After an ascension | counter "0" for about 43 s, no shop button until the first coins; then 3 → 7.5 → 11.3 …; the shop button appears already glowing |
 | Coin counter digits | AutoIt (488, 69)–(807, 97), white fill FFFFFF |
-| Bonus Stage 2 start | "Swipe to Start" slider 007E00 at (443, 620); then "Golden Invasion appeared!" and about 10 s before "Go!" |
+| Bonus Stage 2 start | "Swipe to Start" slider handle 007E00 at one of the four `SLIDER_POSITIONS` (bottom-left: (443, 620)); then "Golden Invasion appeared!" and about 10 s before "Go!" |
 | Second Wind | green 00A400 at (615, 590), click (560, 600); Close red AF0000 at (716, 600) |
 | Desktop | KDE asks for remote-control permission on the first XTEST input after XWayland starts; the game stops drawing while fully covered; a destroyed window gives BadDrawable/BadWindow; a relaunched game reused window id 0x3a00008 |
 

@@ -129,7 +129,9 @@ def test_buy_upgrade_skips_the_excluded_upgrades(game, fake) -> None:
 
 
 def test_auto_upgrade_logs_when_the_shop_does_not_open(game, fake, event_names) -> None:
-    Shop(game).auto_upgrade()
+    completed = Shop(game).auto_upgrade()
+
+    assert completed is False  # the caller retries soon
 
     assert fake.clicks() == [(1163, 655), (1163, 655)]  # the second: a lost click is retried once
     assert "AutoUpgrade shop not open" in event_names()

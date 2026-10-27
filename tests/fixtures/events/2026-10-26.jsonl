@@ -1,0 +1,43 @@
+{"ts": 1792991034.641, "event": "Bot started", "window": "1280x720", "window_name": "Idle Slayer", "offset_x": 8, "offset_y": 31, "color_tolerance": 0, "jump_interval_ms": 150, "circle_portals": false, "circle_portals_count": 7, "disable_rage_without_soul_bonus": false, "auto_buy_upgrades": true, "auto_buy_minutes": 0.5, "auto_ascend": true, "auto_ascend_minutes": 30.0, "auto_ascend_percent": 10.0, "post_ascend_first_buy_seconds": 15, "ascend_bonus_sample_minutes": 2.5, "auto_buy_tree": false, "skip_bonus_stage": false, "no_lockpicking": true, "no_reinforced_crystal_saver": false, "perfect_chest_hunt": true, "craft_soul_bonus": false, "craft_rage_pill": false, "craft_dimensional_staff": false, "craft_bidimensional_staff": false, "log_dir": "logs", "log_level": "INFO", "save_frames": true, "blackbox_fps": 4.0, "blackbox_minutes": 60.0}
+{"ts": 1792991034.687, "event": "Paused: game not focused"}
+{"ts": 1792991035.768, "event": "Resumed"}
+{"ts": 1792991068.288, "event": "AutoUpgrade Done", "upgrades": 1, "equipment": 5, "rounds": 1}
+{"ts": 1792991132.955, "event": "Paused: game not focused"}
+{"ts": 1792991144.304, "event": "Resumed"}
+{"ts": 1792991190.168, "event": "Ascend bonus", "percent": 10.2}
+{"ts": 1792991190.791, "event": "Ascended", "path": "opened_panel"}
+{"ts": 1792991194.285, "event": "AutoUpgrade shop not open"}
+{"ts": 1792991205.845, "event": "Coins reached 6", "coins": 6.0}
+{"ts": 1792991218.498, "event": "Paused: game not focused"}
+{"ts": 1792991218.589, "event": "Bot stopped"}
+{"ts": 1792991448.383, "event": "Bot started", "window": "1280x720", "window_name": "Idle Slayer", "offset_x": 8, "offset_y": 31, "color_tolerance": 0, "jump_interval_ms": 150, "circle_portals": false, "circle_portals_count": 7, "disable_rage_without_soul_bonus": false, "auto_buy_upgrades": true, "auto_buy_minutes": 1.0, "auto_ascend": true, "auto_ascend_minutes": 30.0, "auto_ascend_percent": 10.0, "post_ascend_first_buy_seconds": 15, "ascend_bonus_sample_minutes": 2.5, "auto_buy_tree": true, "skip_bonus_stage": false, "no_lockpicking": true, "no_reinforced_crystal_saver": false, "perfect_chest_hunt": true, "craft_soul_bonus": false, "craft_rage_pill": false, "craft_dimensional_staff": false, "craft_bidimensional_staff": false, "log_dir": "logs", "log_level": "INFO", "save_frames": true, "blackbox_fps": 4.0, "blackbox_minutes": 60.0}
+{"ts": 1792991448.426, "event": "Paused: game not focused"}
+{"ts": 1792991449.507, "event": "Resumed"}
+{"ts": 1792991456.349, "event": "Tree node bought", "node": "Idle Earrings I"}
+{"ts": 1792991457.652, "event": "Tree node bought", "node": "Idle Earrings II"}
+{"ts": 1792991458.966, "event": "Tree node bought", "node": "Blessing of Cronus"}
+{"ts": 1792991460.3, "event": "Tree node bought", "node": "Portals"}
+{"ts": 1792991466.903, "event": "Tree node not bought", "node": "Portal Traveler"}
+{"ts": 1792991519.497, "event": "AutoUpgrade Done", "upgrades": 7, "equipment": 22, "rounds": 2}
+{"ts": 1792991598.853, "event": "Ascend bonus", "percent": 1.9}
+{"ts": 1792991693.843, "event": "Paused: game not focused"}
+{"ts": 1792991693.894, "event": "Bot stopped"}
+{"ts": 1793051098.154, "event": "Bot started", "window": "1280x720", "window_name": "Idle Slayer", "offset_x": 8, "offset_y": 31, "color_tolerance": 0, "jump_interval_ms": 150, "circle_portals": false, "circle_portals_count": 7, "disable_rage_without_soul_bonus": false, "auto_buy_upgrades": true, "auto_buy_minutes": 1.0, "auto_ascend": true, "auto_ascend_minutes": 30.0, "auto_ascend_percent": 10.0, "post_ascend_first_buy_seconds": 15, "ascend_bonus_sample_minutes": 2.5, "auto_buy_tree": true, "skip_bonus_stage": false, "no_lockpicking": true, "no_reinforced_crystal_saver": false, "perfect_chest_hunt": true, "craft_soul_bonus": false, "craft_rage_pill": false, "craft_dimensional_staff": false, "craft_bidimensional_staff": false, "log_dir": "logs", "log_level": "INFO", "save_frames": true, "blackbox_fps": 4.0, "blackbox_minutes": 60.0}
+{"ts": 1793051098.196, "event": "Paused: game not focused"}
+{"ts": 1793051101.979, "event": "Resumed"}
+{"ts": 1793051102.327, "event": "routine_start", "name": "claim_quests"}
+{"ts": 1793051102.327, "event": "Claiming quest"}
+{"ts": 1793051108.498, "event": "Tree stopped", "node": "Portal Traveler", "reason": "not enough SP"}
+{"ts": 1793051165.463, "event": "AutoUpgrade Done", "upgrades": 0, "equipment": 6, "rounds": 1}
+{"ts": 1793051249.716, "event": "Ascend bonus", "percent": 21.5}
+{"ts": 1793051250.338, "event": "Ascended", "path": "opened_panel"}
+{"ts": 1793051254.027, "event": "Shop tab not shown", "tab": "upgrades"}
+{"ts": 1793051256.017, "event": "Tree jewel offer closed", "node": "Portal Traveler"}
+{"ts": 1793051256.042, "event": "frame", "label": "tree-jewel-offer", "path": "logs/frames/20261026-184736-022-tree-jewel-offer.png"}
+{"ts": 1793051257.471, "event": "MegaHorde Rage"}
+{"ts": 1793051699.538, "event": "Quest Claimed"}
+{"ts": 1793052914.35, "event": "Silver Box Collected"}
+{"ts": 1793053722.937, "event": "Start of BonusStage"}
+{"ts": 1793053728.264, "event": "BonusStage detected", "stage": 2, "spirit_boost": false}
+{"ts": 1793053743.265, "event": "Sync timeout", "where": "BonusStage2-s1", "timeout_ms": 15000}
+{"ts": 1793053781.524, "event": "Sync timeout", "where": "BonusStage2-s1", "timeout_ms": 15000}

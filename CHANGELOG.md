@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.3.0 (2026-10-26)
+
+Groundwork for the Windows version. Nothing changes in how the bot plays.
+
+### New
+- **`idle-runner` command.** After `pipx install` (or `pip install -e .`) the bot is the `idle-runner` command. With no arguments it opens the window, and `idle-runner --version` prints the version.
+
+### Changed
+- The package is now called `idle-slayer-bot`, the name the repository will get on GitHub. The version comes from `idle_runner.__version__`.
+
+### Under the hood
+- The game window is opened through `open_backend()`, which will pick X11 or Windows. `python-xlib` is only installed on Linux. There is no Windows backend yet.
+- A build made with PyInstaller works from its own folder, where it keeps `config.toml` and `logs/`.
+- Automated tests run on GitHub for Linux and Windows, with Python 3.12 and 3.14.
+- A release workflow that builds the Windows zip. It runs from the v2.0.0 tag on, so v1.x tags stay Linux source releases.
+- An update check against the latest GitHub release. The window doesn't use it yet.
+
+## v1.2.1 (2026-10-26)
+
+### Fixed
+- **Coin counter after an Ultra Ascension.** The counter shows thousands with a comma ("1,251"). The bot read them as small numbers (7.0) and announced "Coins reached 6" about every 10 minutes. It now reads the comma and the digit 9, which it had never seen. Re-reading 3,600 recorded frames changed only the readings that used to fail.
+- **"Swipe to Start" in bonus stages.** If the swipe didn't take, the bot was supposed to try again, but it waited for a white pixel this version of the game never shows. It now swipes again while the green handle is still showing in any of its four places (seen in all 30 recorded stage starts).
+- **A shop that doesn't open is tried again 15 seconds later**, for example right after a minigame, while its results screen still covers the shop. Before, the bot waited for the next buy interval. It retries once: if the shop stays shut, the normal interval takes over again.
+
+## v1.2.0 (2026-10-26)
+
+### New
+- **Choose which Ascension Tree nodes the bot buys, and in what order.** List them under `tree_order` in a new `[tree]` section of `config.toml`. A name the bot doesn't know, or a name listed twice, is reported as an error. Without the list the bot uses the recommended order: 110 nodes, now including the first ones (Village Key, Idle Earrings I and II, Blessing of Cronus, Portals, the ores and Soul Gem) for players who haven't bought them yet. Saving settings from the window keeps your list.
+- **Orange Random Box.** The box with a sword is now seen like the silver one, so a buy stops for it and the jumper can grab it. It shows up often and in every zone: in 19,181 recorded frames, at 126 different minutes. Its colour appears in only one other place, the Ascension Tree panel, where the bot never looks for boxes.
+
 ## v1.1.2 (2026-10-26)
 
 ### Fixed

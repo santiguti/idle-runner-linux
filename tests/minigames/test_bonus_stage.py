@@ -1,6 +1,12 @@
+from pathlib import Path
+
 import pytest
 
 from idle_runner.minigames.bonus_stage import BS2_SECTIONS, bonus_stage, bs2_section, bs3_section1, run_bs2, run_bs3
+from idle_runner.minigames.common import slider_showing
+from tests.fakes import read_png
+
+FIXTURES = Path(__file__).parents[1] / "fixtures" / "bonus_stage"
 
 
 def test_bs2_stops_and_logs_when_the_stage_fails(game, fake, event_names) -> None:
@@ -104,3 +110,41 @@ def test_bs2_first_sync_finds_the_block_wherever_it_stops(game, fake, event_name
     bs2_section(game, BS2_SECTIONS[0], "BonusStage2-s1")
 
     assert "Sync timeout" not in event_names()
+
+
+@pytest.mark.parametrize(("name", "showing"), [
+    # "Swipe to Start" frames recorded 2026-10-22/23 (the handle in three of the four places), and 1 s later
+    ("swipe-top-left", True), ("swipe-bottom-left", True), ("swipe-bottom-right", True), ("playing-bs2", False),
+])
+def test_slider_showing_on_recorded_frames(game, fake, name: str, showing: bool) -> None:
+    fake.frame[:] = read_png(FIXTURES / f"{name}.png")
+
+    assert slider_showing(game) is showing
+
+
+def test_swipe_retried_while_the_slider_shows(game, fake, event_names) -> None:
+    # The original retried while (775, 448) was white; on this version that pixel is 141416 with the dialog up.
+    fake.paint(442, 560, 0x007E00)  # the handle, top left
+    fake.paint(716, 600, 0xAF0000)  # the fail screen that ends the skipped stage
+    swipes = []
+
+    def handle_stays_after_the_first_swipe(action: tuple) -> None:
+        if action == ("click", 840 - 8, 560 - 31):  # a swipe starts
+            swipes.append(fake.t)
+            if len(swipes) == 2:
+                fake.paint(442, 560, 0)  # the second one takes
+
+    fake.on_action = handle_stays_after_the_first_swipe
+    bonus_stage(game, skip=True)
+
+    assert len(swipes) == 2
+    assert "Start of BonusStage" in event_names() and "stuck" not in event_names()
+
+
+def test_one_swipe_is_enough_when_the_slider_goes(game, fake) -> None:
+    fake.paint(442, 560, 0x007E00)
+    fake.paint(716, 600, 0xAF0000)
+    fake.on_action = lambda a: fake.paint(442, 560, 0) if a == ("click", 840 - 8, 560 - 31) else None
+    bonus_stage(game, skip=True)
+
+    assert fake.clicks().count((840, 560)) == 1

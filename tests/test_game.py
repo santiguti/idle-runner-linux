@@ -1,10 +1,12 @@
 import logging
+import subprocess
+import sys
+import types
 
 import pytest
 
-from idle_runner.game import Game
+from idle_runner.game import Game, GameUnavailable, open_backend
 from idle_runner.log import inputs, log
-from idle_runner.x11 import GameUnavailable
 from tests.fakes import OFFSET
 
 
@@ -152,3 +154,18 @@ def test_inputs_stay_off_the_console(logs) -> None:
 
     assert not console.filter(record)
     assert console.filter(log.makeRecord(log.name, logging.INFO, __file__, 0, "Bot started", (), None))
+
+
+def test_core_imports_without_xlib() -> None:
+    code = ("import sys; sys.modules['Xlib'] = None; "
+            "import idle_runner.runner, idle_runner.blackbox, idle_runner.__main__")
+    assert subprocess.run([sys.executable, "-c", code]).returncode == 0
+
+
+def test_open_backend_picks_the_platform(monkeypatch) -> None:
+    fake = types.ModuleType("idle_runner.win32")
+    fake.Win32Backend = lambda name: ("win32", name)
+    monkeypatch.setitem(sys.modules, "idle_runner.win32", fake)
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    assert open_backend("Idle Slayer") == ("win32", "Idle Slayer")

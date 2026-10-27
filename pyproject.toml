@@ -1,19 +1,38 @@
 [project]
-name = "idle-runner-linux"
-version = "1.1.2"
-description = "A pixel-based Idle Slayer bot for Linux"
+name = "idle-slayer-bot"
+dynamic = ["version"]
+description = "Idle Runner: an Idle Slayer bot (pixel-based, keyboard and mouse only) for Linux, Windows support in progress"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["idle-slayer", "idle-slayer-bot", "idle-game", "bot", "automation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Games/Entertainment",
+]
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.0",
-    "python-xlib>=0.33",
+    "python-xlib>=0.33; sys_platform == 'linux'",
 ]
+
+[project.urls]
+Homepage = "https://github.com/santiguti/idle-slayer-bot"
+Issues = "https://github.com/santiguti/idle-slayer-bot/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3"]
+build = ["pyinstaller>=6.10", "pillow>=11"]  # CI only: the Windows exe (.github/workflows/release.yml)
 
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
+
+[project.scripts]
+idle-runner = "idle_runner.__main__:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "idle_runner.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["idle_runner*"]

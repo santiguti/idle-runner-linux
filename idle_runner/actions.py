@@ -11,6 +11,8 @@ DIMENSIONAL_STAFF = 0xF37C55
 BIDIMENSIONAL_STAFF = 0x526629
 BOX_SLATE = np.array([0x5F, 0x6D, 0x95], dtype=np.uint8)  # frame of the floating silver Random Box
 MIN_BOX_PIXELS = 100  # measured 2026-10-23: the box shows 117-508 of them, other objects at most 52
+BOX_ORANGE = np.array([0xDF, 0x71, 0x26], dtype=np.uint8)  # frame of the floating orange (sword) Random Box
+MIN_ORANGE_BOX_PIXELS = 100  # measured 2026-10-26 over 900 frames: 0 without a box, 599-817 with one, 104 entering
 TAB_SELECTED = 0x5E261B  # ±6: a selected tab, in the shop and the ascension panel (fades 5A251A-62271C)
 PANEL_X_RED = 0xAD1111  # the ascension panel's X tab at (538, 681), on any of its tabs (measured 2026-10-25)
 
@@ -26,14 +28,15 @@ def close_all(game: Game) -> None:
 
 
 def box_on_screen(game: Game) -> bool:
-    """A silver Random Box floats over the run, left of the shop panel. Not in the original.
+    """A silver or orange Random Box floats over the run, left of the shop panel. Not in the original.
 
     The player only gets it by jumping into it, so shopping stops while one is up. The top-centre
-    bonus ("Silver Box Collected") sends 5 of them in a row. Orange boxes aren't covered yet: no
-    sample of them has been measured.
+    bonus ("Silver Box Collected") sends 5 of them in a row. The orange one carries a sword and was
+    found in the 2026-10-23 recording (its sword has 51 slate pixels, below the silver threshold).
     """
     region = game.grab(8, 131, 797, 510)  # client (0, 100)-(789, 479)
-    return int((region == BOX_SLATE).all(axis=2).sum()) >= MIN_BOX_PIXELS
+    return (int((region == BOX_SLATE).all(axis=2).sum()) >= MIN_BOX_PIXELS
+            or int((region == BOX_ORANGE).all(axis=2).sum()) >= MIN_ORANGE_BOX_PIXELS)
 
 
 def soul_bonus_active(game: Game) -> bool:

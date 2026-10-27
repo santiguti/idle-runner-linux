@@ -6,135 +6,24 @@ Clicking a node ("Buy on Click" off) opens a modal whose pixel at (468, 571) tel
 (the prerequisites are met, not necessarily the SP), red = one wide button, "Can't buy yet" (a
 prerequisite is missing) or "Close" (bought); the wider text tells them apart.
 
-The order is the wiki's, which doesn't follow the tree's links: a node whose prerequisite comes later is
-skipped until a purchase may have unlocked it. A node that can be bought but costs more SP than there is
-stops the routine, so SP is saved in the wiki's order.
+The order is `Settings.tree_order` (by default the wiki's, see tree_nodes.py), which doesn't follow the
+tree's links: a node whose prerequisite comes later is skipped until a purchase may have unlocked it. A
+node that can be bought but costs more SP than there is stops the routine, so SP is saved in that order.
 
 **Buy without enough SP offers to pay the difference with jewels**, bought with real money (2026-10-26).
 So Buy is clicked only after the node's tooltip showed its cost in green (enough SP), and that offer is
 closed at once if it shows anyway. Its jewel button needs its "I understand" box ticked first; nothing in
 the bot clicks that box.
 """
+from collections.abc import Sequence
+
 import numpy as np
 
 from idle_runner.actions import PANEL_X_RED, TAB_SELECTED, open_ascension_tab
 from idle_runner.game import Game
 from idle_runner.log import event
+from idle_runner.tree_nodes import NODES
 
-# The wiki's order (user's request, 2026-10-26: "respetemos lo que diga la wiki"), as surveyed in the game
-# on 2026-10-26: every point was clicked and its modal's name read. Points are node centres at minimum zoom,
-# in AutoIt coordinates; costs as the game shows them.
-ORDER: list[tuple[str, tuple[int, int]]] = [
-    # 1. What's left of the wiki's Ultra Ascension guide: Portal Traveler (jellies), the way to the Bow,
-    #    then Stability and Triple Shot (Ancient Quests and Hot Desert come first there, but sit under the
-    #    header at minimum zoom: not located yet).
-    ('Portal Traveler', (278, 152)),  # 200
-    ('Legendary Belt', (248, 333)),  # 350
-    ('Sacred Book of Projectiles', (308, 333)),  # 1,000
-    ('Stability', (337, 333)),  # 3,000
-    ('Triple Shot', (337, 362)),  # 4,000
-    # 2. The cheap nodes the tier list's "First Ultra Ascension" section lists right after Blessing of Cronus.
-    ('Orange Ore', (267, 227)),  # 5
-    ('Yellow Ore', (348, 227)),  # 5
-    ('Dangerous While Alone', (118, 242)),  # 35
-    # 3. The tier list, tiers 1-10 in the wiki's order (Bullet Time and Map: not located yet).
-    ("Doesn't Matter to Me", (307, 303)),  # 150
-    ('Soul Slash', (247, 363)),  # 450
-    ('Axe Edge', (247, 393)),  # 600
-    ('Minions', (250, 423)),  # 1,200
-    ('Money Laundering', (178, 152)),  # 25
-    ('Purple Ore', (278, 249)),  # 40
-    ('Cheap Darkness', (308, 217)),  # 30
-    ('Dagger Edge', (178, 303)),  # 75
-    ('Stocks Buyer', (207, 151)),  # 50
-    ('Every Day Counts', (308, 274)),  # 50
-    ('Idle Earrings III', (147, 332)),  # 100
-    ('Idle Earrings IV', (178, 333)),  # 250
-    ('Idle Earrings of Death', (207, 333)),  # 250
-    ('Bring Hell', (338, 303)),  # 600
-    ('Mystic Valley', (277, 363)),  # 1,200
-    ('Enchanted Arrows', (308, 363)),  # 600
-    ('Dark Wand', (248, 452)),  # 2,000
-    ('Dark Wizard', (276, 454)),  # 2,500
-    ('Ethereal Wand', (219, 452)),  # 500
-    ('Dual Randomness', (218, 393)),  # 300
-    ('Coins In The Box', (217, 422)),  # 350
-    ('Royalties', (217, 362)),  # 400
-    ('Lunar Idle Earrings', (189, 366)),  # 950
-    ('Solar Idle Earrings', (187, 392)),  # 1,000
-    ('Book of Efficiency I', (119, 441)),  # 500
-    ('Silver Money Amulet', (278, 393)),  # 1,600
-    ('Golden Money Amulet', (308, 393)),  # 2,000
-    ('Soul Reaper II', (307, 421)),  # 1,000
-    ('Soul Amulet', (338, 393)),  # 3,000
-    ('Rock And Stone', (248, 523)),  # 10,000
-    ('Embrace The Fear', (337, 421)),  # 6,500
-    ('Skeleton', (338, 453)),  # 8,000
-    ('Safety First', (148, 363)),  # 8,000
-    ('Chest Hunt Saver', (118, 333)),  # 5,000
-    ('Sword Edge II', (147, 393)),  # 1,850
-    ('Shinies', (118, 393)),  # 500
-    ('Golden Invasion', (88, 392)),  # 650
-    ('Saved', (368, 322)),  # 2,500
-    ('Book of Efficiency II', (120, 473)),  # 5,000
-    ('Bonus Stage 2', (367, 485)),  # 5,000
-    ('Doomed', (368, 283)),  # 2,500
-    ('Permanent Supply Boxes', (188, 422)),  # 4,000
-    ('King of The Sea', (367, 207)),  # 6,500
-    ('ASHPD', (307, 152)),  # 5,000
-    ('Wall Breaker', (276, 421)),  # 3,500
-    ('Tornado of Souls', (398, 207)),  # 20,000
-    ('Gemstone Rush', (398, 303)),  # 10,000
-    ('Bag', (430, 333)),  # 10,000
-    ('Terra Idle Earrings', (148, 443)),  # 7,500
-    ('Roll The Dice', (398, 173)),  # 16,500
-    ('Premium Time', (368, 173)),  # 25,000
-    ('Knight Services', (247, 481)),  # 7,500
-    ('High Alchemy', (306, 452)),  # 12,000
-    ('Blue Sparkle', (398, 248)),  # 6,000
-    ('Factory', (367, 392)),  # 140,000
-    ('Human After All', (368, 423)),  # 60,000
-    ('Protect', (398, 513)),  # 15,000
-    ('Oblivion Idle Earrings', (168, 463)),  # 23,000
-    ('Boost Blood', (447, 207)),  # 50,000
-    ('Augmented Boost Kill', (447, 234)),  # 100,000
-    ('Super Chest Souls', (477, 208)),  # 35,000
-    ('Soul Silver', (392, 146)),  # 35,000
-    ('Muscle Memory', (367, 362)),  # 35,000
-    ('Book of Efficiency III', (118, 503)),  # 50,000
-    ('Idle Earrings of Unity', (148, 483)),  # 45,000
-    ('Mega Horde', (437, 303)),  # 175,000
-    ('Blessing of Kratos', (397, 352)),  # 95,000
-    ('Divinities', (398, 393)),  # 200,000
-    ('Critical Culling', (207, 526)),  # 150,000
-    ('Bonus Rewards+', (427, 172)),  # 1,250,000
-    ('Mega Chest Souls', (428, 143)),  # 1,500,000
-    ('Book of Efficiency IV', (119, 529)),  # 500,000
-    # 4. The rest of the "First Ultra Ascension" section, in its order; the Ultra Ascension node last (it
-    #    brings the Ultra Ascend button back, which the bot never clicks).
-    ('Inner Power', (276, 524)),  # 5,000
-    ('3 Rows', (457, 173)),  # 350,000
-    ('Critical Training', (178, 493)),  # 350,000
-    ('Critical Practice', (178, 553)),  # 350,000
-    ('Critical Study', (178, 523)),  # 350,000
-    ('Perfect Prestige', (466, 422)),  # 2,500,000
-    ('Rage Mode', (210, 564)),  # 30,000,000
-    ('Already Enraged', (238, 563)),  # 100
-    ('Outrage', (268, 563)),  # 200
-    ('Fury', (237, 592)),  # 10
-    ("Gala's Bone", (338, 491)),  # 600,000
-    ('Climbing Boots', (368, 513)),  # 75,000
-    ('Book of Efficiency V', (148, 533)),  # 5,000,000
-    ('Giant Horde', (497, 332)),  # 50,000,000
-    ('Careful Slayer', (457, 333)),  # 12,500,000
-    ('Master Chest Souls', (118, 363)),  # 150 M
-    ('Advanced Cooking', (448, 272)),  # 2,000,000
-    ('Ramen', (477, 242)),  # 3,500,000
-    ('Stew', (477, 302)),  # 4,000,000
-    ('Bonus Sphere Control', (367, 542)),  # 5,000,000
-    ('Astral Slayer', (507, 271)),  # 500 M
-    ('Ultra Ascension', (450, 392)),  # 2,000,000
-]
 MODAL_STATE = (468, 571)
 BUY_GREEN = 0x00A400
 MODAL_RED = 0xAF0000
@@ -149,8 +38,9 @@ COST_RED = (0xAD, 0x11, 0x11)
 
 
 class Tree:
-    def __init__(self, game: Game) -> None:
+    def __init__(self, game: Game, order: Sequence[str]) -> None:
         self.game = game
+        self.order = order  # node names from tree_nodes.NODES (Settings.tree_order)
         # Nodes seen bought during this run of the bot, so they aren't clicked again. An Ultra Ascension by
         # hand while the bot runs makes this stale: restart the bot after one.
         self.bought: set[str] = set()
@@ -160,8 +50,8 @@ class Tree:
     def buy(self) -> None:
         g = self.game
         if self.open_tree():
-            for name, point in ORDER:
-                if name not in self.bought | self.locked and not self.buy_node(name, point):
+            for name in self.order:
+                if name not in self.bought | self.locked and not self.buy_node(name, NODES[name].point):
                     break
         g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
 

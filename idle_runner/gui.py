@@ -18,6 +18,7 @@ from tkinter import messagebox, ttk
 from idle_runner.blackbox import mark
 from idle_runner.config import SECTIONS, Settings, check_ranges, dump_settings, load_settings
 from idle_runner.log import setup_logging
+from idle_runner.process import self_command
 from idle_runner.stats import summarize
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "config.example.toml"
@@ -55,6 +56,7 @@ class App:
                 settings = load_settings(config_path)
         except ValueError as exc:
             messagebox.showerror("Idle Runner", f"{exc}\n\nShowing the defaults instead.")
+        self.tree_order = settings.tree_order  # not editable here: kept as loaded when the form is saved
 
         root.title("Idle Runner")
         root.geometry("1000x640")
@@ -114,7 +116,7 @@ class App:
                 values[key] = var.get() if kind is bool else kind(var.get().strip())
             except ValueError:
                 raise ValueError(f"'{key}' must be a {kind.__name__}, got {var.get()!r}") from None
-        return Settings(**values)
+        return Settings(**values, tree_order=self.tree_order)
 
     def save(self) -> bool:
         try:
@@ -140,7 +142,7 @@ class App:
     def start(self) -> None:
         if self.running() or not self.save():
             return
-        self.bot = subprocess.Popen([sys.executable, "-m", "idle_runner", "run", "--config", str(self.config_path)],
+        self.bot = subprocess.Popen(self_command("run", "--config", str(self.config_path)),
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         threading.Thread(target=self.read_output, args=(self.bot,), daemon=True).start()
 

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from idle_runner.game import STUCK_MS, Game
 from idle_runner.log import event
-from idle_runner.minigames.common import slide_until_gone
+from idle_runner.minigames.common import slide_until, slider_showing
 
 Moves = tuple[tuple[int, int], ...]
 
@@ -103,7 +103,9 @@ def bonus_stage(game: Game, skip: bool) -> None:
     game.sleep(200)
     is_bs3 = game.pixel_search(160, 498, 200, 498, 0x16171F) is not None
     game.save_frame("bonus-stage-start")
-    slide_until_gone(game, "bonus_stage", 775, 448, 775, 448, 0xFFFFFF)
+    # The original retried while (775, 448) is white, but that pixel is 141416 with the dialog up on this
+    # version (2026-10-22): retry while the green handle still shows instead.
+    slide_until(game, "bonus_stage", lambda: not slider_showing(game))
     if skip:
         do_nothing(game, 3 if is_bs3 else 2)
     else:
