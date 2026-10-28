@@ -17,12 +17,18 @@ def self_command(*args: str) -> list[str]:
     return [sys.executable, "-m", "idle_runner", *args]
 
 
-def stop_on_stdin_eof(stream: IO[str], stop: Callable[[], None] = _thread.interrupt_main) -> threading.Thread:
+def stop_on_stdin_eof(stream: IO[str], stop: Callable[[], None] = _thread.interrupt_main,
+                      commands: dict[str, Callable[[], None]] | None = None) -> threading.Thread:
     """Call `stop` once `stream` ends: the parent closed the pipe, or died. The default raises
-    KeyboardInterrupt in the main thread, the same path as Ctrl+C, which releases every held key."""
+    KeyboardInterrupt in the main thread, the same path as Ctrl+C, which releases every held key.
+    A line that names one of `commands` (the window's "check-settings") runs it; other lines are ignored."""
+    commands = commands or {}
+
     def watch() -> None:
-        while stream.read(4096):
-            pass
+        for line in stream:
+            action = commands.get(line.strip())
+            if action:
+                action()
         stop()
 
     thread = threading.Thread(target=watch, name="stdin-watch", daemon=True)

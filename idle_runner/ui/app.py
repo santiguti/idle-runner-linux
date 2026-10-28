@@ -23,6 +23,7 @@ from idle_runner.config import Settings
 from idle_runner.game import open_backend
 from idle_runner.log import setup_logging
 from idle_runner.process import self_command
+from idle_runner.state import state_path, update_state
 from idle_runner.stats import summarize
 from idle_runner.ui.activity import EventTail, Session, apply, describe
 from idle_runner.ui.settings_page import SettingsPage
@@ -42,7 +43,8 @@ SETUP = """Before you start, in Idle Slayer:
 •  Custom cursor off, portal dialogue off, scientific notation off.
 •  Rounded bulk on, hide locked quest rewards on.
 •  Don't buy the Vertical Magnet.
-The bot reads these settings at start (then presses Cancel) and lists any wrong one under Problems.
+At the first Start of each day the bot reads these settings (then presses Cancel) and lists any wrong
+one under Problems. Settings, "Check game settings now" reads them again.
 
 The bot only plays while the game window is in front. Click another window to pause it, click the game to
 resume."""
@@ -79,6 +81,17 @@ class BotProcess:
 
     def exit_code(self) -> int | None:
         return None if self.process is None else self.process.poll()
+
+    def send(self, command: str) -> bool:
+        """Send the running bot a command line (process.stop_on_stdin_eof). False if there's no bot to hear it."""
+        if not self.running() or not self.process or not self.process.stdin or self.process.stdin.closed:
+            return False
+        try:
+            self.process.stdin.write(command + "\n")
+            self.process.stdin.flush()
+        except OSError:  # it has just stopped
+            return False
+        return True
 
     def stop(self) -> None:
         """Ask the bot to stop (it releases every held key first)."""
@@ -153,7 +166,7 @@ class App:
         self.content = ttk.Frame(root, padding=(24, 20, 24, 16))
         self.content.pack(side="left", fill="both", expand=True)
         self.pages: dict[str, ttk.Frame] = {}
-        self.settings_page = SettingsPage(self.content, config_path, self.settings_saved)
+        self.settings_page = SettingsPage(self.content, config_path, self.settings_saved, self.check_game_settings)
         self.pages["Settings"] = self.settings_page
         self.tree_page = TreePage(self.content, self.settings_page.tree_order, self.settings_page.set_tree_order)
         self.pages["Tree order"] = self.tree_page
@@ -308,6 +321,15 @@ class App:
         self.bot.stop_and_wait()
         self.start_or_stop()
 
+    def check_game_settings(self) -> None:
+        """The game's settings are checked once a day: check them again, now or at the next Start."""
+        if self.bot.send("check-settings"):
+            text = "The bot checks the game's settings in a few seconds, while the game is in front."
+        else:
+            update_state(state_path(self.config_path), settings_ok_date=None)
+            text = "The bot checks the game's settings at the next Start."
+        self.settings_page.show_message(text)
+
     def settings_saved(self, settings: Settings) -> None:
         self.use_log_dir(settings)
         self.refresh()
@@ -344,6 +366,8 @@ class App:
             title, detail = "Paused", f"{s.detail.capitalize()}. Click the game to resume."
         elif running and s.state == "game lost":
             title, detail = "Waiting for the game", "Its window closed. The bot looks for it every 2 seconds."
+        elif running and s.doing:  # the window polls every 250 ms: a shorter routine may not show
+            title, detail = "Running", f"{s.doing}…"
         elif running:
             title, detail = "Running", "Playing while the game is in front. Click another window to pause it."
         elif self.bot.exit_code() not in (None, 0):

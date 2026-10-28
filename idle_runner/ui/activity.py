@@ -17,6 +17,23 @@ MINIGAMES = {
     "Start of BossFight Victor": "Victor boss fight",
     "Start of Ascending Heights": "Ascending Heights",
 }
+# What the dashboard says the bot is doing while one of its routines runs (Game.routine's names). The
+# Megahorde's rage has none: it lasts 11 ms and fires ~45 times in 2 s at a Megahorde.
+DOING = {
+    "check_game_settings": "Checking the game's settings",
+    "buy_tree": "Checking the Ascension Tree",
+    "send_minions": "Checking the minions",
+    "auto_upgrade": "Shopping",
+    "claim_quests": "Claiming quests",
+    "ascend_bonus_sample": "Reading the ascension bonus",
+    "auto_ascend": "Ascending",
+    "circle_portals": "Taking a portal",
+    "bonus_stage": f"Playing {MINIGAMES['Start of BonusStage']}",
+    "chest_hunt": f"Playing {MINIGAMES['Chesthunt Started']}",
+    "boss_knight": f"Playing {MINIGAMES['Start of BossFight Knight']}",
+    "boss_victor": f"Playing {MINIGAMES['Start of BossFight Victor']}",
+    "ascending_heights": f"Playing {MINIGAMES['Start of Ascending Heights']}",
+}
 # Shown as problems when they carry one of these fields: "Sync timeout: BonusStage2-s1".
 DETAIL_FIELDS = ("where", "node", "reason", "setting")
 
@@ -25,6 +42,7 @@ DETAIL_FIELDS = ("where", "node", "reason", "setting")
 class Session:
     state: str = "stopped"  # "stopped" | "running" | "paused" | "game lost"
     detail: str = ""  # why it is paused
+    doing: str = ""  # the routine running now, as DOING names it
     started_ts: float | None = None
     upgrades: int = 0
     equipment: int = 0
@@ -55,7 +73,11 @@ def apply(session: Session, record: dict) -> None:
     elif name == "Game window lost":
         session.state, session.detail = "game lost", ""
     elif name in ("Bot stopped", "Bot stopped after repeated errors"):
-        session.state, session.detail = "stopped", ""
+        session.state, session.detail, session.doing = "stopped", "", ""
+    elif name == "routine_start":
+        session.doing = DOING.get(record.get("name", ""), "")
+    elif name in ("routine_end", "routine_abort", "tick_crash"):  # a routine that crashes logs no end
+        session.doing = ""
     elif name == "AutoUpgrade Done":
         session.upgrades += record.get("upgrades", 0)
         session.equipment += record.get("equipment", 0)
@@ -107,6 +129,16 @@ def describe(record: dict, session: Session | None = None) -> tuple[str, str] | 
         return "buy", "A minion came back from its mission"
     if name == "Minion sent":
         return "buy", f"Sent a minion ({record.get('cost')} SP)"
+    if name == "Minion not sent" and record.get("reason") == "not enough SP":
+        return "buy", f"Minions: not enough SP to send one ({record.get('cost')} SP)"
+    if name == "Game settings checked":  # a wrong or missing one is a problem of its own
+        return None if record.get("wrong") or record.get("missing") else ("state", "Game settings OK")
+    if name == "Game settings check skipped":
+        return "state", "Game settings: already checked today"
+    if name == "Tree stopped":
+        if record.get("reason") == "not enough SP":
+            return "tree", f"Tree: next is {record.get('node')}, not enough SP"
+        return "tree", f"Tree stopped at {record.get('node')}: {record.get('reason')}"
     if name in ("Bot started", "Bot stopped", "Resumed", "Game window found") or name.startswith("Paused: "):
         return "state", name
     if name == "Game unavailable":

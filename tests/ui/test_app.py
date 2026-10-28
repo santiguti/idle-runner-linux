@@ -119,3 +119,43 @@ def test_no_support_button_without_a_donation_page(window, monkeypatch) -> None:
     monkeypatch.setattr(app_module, "DONATE_URL", "")
 
     assert window().support_button is None
+
+
+def test_the_dashboard_says_what_the_bot_is_doing(window, tmp_path, monkeypatch) -> None:
+    app = window()
+    monkeypatch.setattr(app.bot, "running", lambda: True)
+    events = tmp_path / "logs" / "events.jsonl"
+    events.parent.mkdir(exist_ok=True)
+    with events.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"ts": 1.0, "event": "Bot started"}) + "\n")
+        f.write(json.dumps({"ts": 2.0, "event": "routine_start", "name": "buy_tree"}) + "\n")
+    app.poll()
+    assert app.state_detail.cget("text") == "Checking the Ascension Tree…"
+
+    with events.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"ts": 3.0, "event": "routine_end", "name": "buy_tree", "ms": 3600}) + "\n")
+    app.poll()
+    assert app.state_detail.cget("text").startswith("Playing while the game is in front")
+
+
+def test_check_game_settings_now_asks_the_running_bot(window, monkeypatch) -> None:
+    import io
+    app = window()
+    stdin = io.StringIO()
+    monkeypatch.setattr(app.bot, "process", type("P", (), {"stdin": stdin, "poll": lambda self: None})())
+
+    app.settings_page.check_button.invoke()
+
+    assert stdin.getvalue() == "check-settings\n"
+    assert "few seconds" in app.settings_page.message.cget("text")
+
+
+def test_check_game_settings_now_with_the_bot_stopped_forgets_today_s_check(window, tmp_path) -> None:
+    from idle_runner.state import load_state, update_state
+    update_state(tmp_path / "state.json", settings_ok_date="2026-10-28", tree_bought=["Village Key"])
+    app = window()
+
+    app.settings_page.check_button.invoke()
+
+    assert load_state(tmp_path / "state.json") == {"settings_ok_date": None, "tree_bought": ["Village Key"]}
+    assert "next Start" in app.settings_page.message.cget("text")

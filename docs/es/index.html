@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idle Runner: bot y autoclicker de Idle Slayer para Linux y Windows</title>
+<meta name="description" content="Un bot gratis y de código abierto para Idle Slayer en Linux y Windows. Juega mientras estás AFK: salta, compra mejoras, juega los minijuegos y asciende leyendo la pantalla. Nunca toca la memoria ni los archivos del juego.">
+<link rel="canonical" href="https://santiguti.github.io/idle-slayer-bot/es/">
+<link rel="alternate" hreflang="en" href="https://santiguti.github.io/idle-slayer-bot/">
+<link rel="alternate" hreflang="es" href="https://santiguti.github.io/idle-slayer-bot/es/">
+<link rel="alternate" hreflang="x-default" href="https://santiguti.github.io/idle-slayer-bot/">
+<meta property="og:title" content="Idle Runner: bot de Idle Slayer para Linux y Windows">
+<meta property="og:description" content="Juega Idle Slayer por ti en Linux y Windows. Gratis y de código abierto.">
+<meta property="og:image" content="https://santiguti.github.io/idle-slayer-bot/images/banner.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Crect width='8' height='8' fill='%23f5c542'/%3E%3Crect x='2' y='2' width='4' height='4' fill='%23ffe28a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="sky">
+  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+  <div class="hero">
+    <p class="lang"><a href="../" hreflang="en" lang="en" data-lang="en">English</a> · <strong aria-current="page">Español</strong></p>
+    <h1>Idle Runner</h1>
+    <p class="lede">Un bot de Idle Slayer para Linux y Windows. Juega por ti mientras estás AFK: mira la pantalla y pulsa las teclas.</p>
+    <div class="download">
+      <a class="btn" id="primary" href="https://github.com/santiguti/idle-slayer-bot/releases">Descargar para Linux</a>
+      <a class="alt" id="secondary" href="https://github.com/santiguti/idle-slayer-bot/releases">o para Windows</a>
+    </div>
+    <p class="fine" id="fine">Gratis y de código abierto. Para la versión de Steam de Idle Slayer.</p>
+  </div>
+  <div class="ground"></div>
+</header>
+
+<main class="wrap">
+  <div class="shot">
+    <img src="../images/ui-dashboard.png" width="1060" height="700"
+         alt="La ventana de Idle Runner mientras el bot juega: las compras, las ascensiones y los últimos eventos de esta partida">
+    <p>Pulsa Start, haz clic en el juego y déjalo jugar. Cambia a otra ventana para pausarlo y haz clic en el juego para seguir.</p>
+  </div>
+
+  <section>
+    <h2>Qué hace</h2>
+    <p class="intro">Es más que un autoclicker: lee la pantalla, así que reacciona a lo que muestra el juego.</p>
+    <dl class="does">
+      <div><dt>Corre</dt><dd>Salta y usa el boost sin parar, al ritmo que elijas.</dd></div>
+      <div><dt>Recoge</dt><dd>Las cajas plateadas y naranjas, las recompensas de las quests, dos Daily Quests extra por día y tus minions cuando vuelven de sus misiones.</dd></div>
+      <div><dt>Compra</dt><dd>Upgrades y equipamiento cada pocos minutos, y envía a tus minions a sus misiones.</dd></div>
+      <div><dt>Viaja</dt><dd>Entra en los portales y, si quieres, recorre las zonas una tras otra.</dd></div>
+      <div><dt>Usa Rage</dt><dd>En las Megahordes, y si quieres solo con Soul Bonus.</dd></div>
+      <div><dt>Juega los minijuegos</dt><dd>Chest Hunts, Bonus Stages 2 y 3, Ascending Heights y la pelea contra Victor.</dd></div>
+      <div><dt>Asciende</dt><dd>Cuando el "+X% CpS bonus" llega al 20 %, o cada 30 minutos como máximo. Puedes cambiar los dos valores o desactivarlo.</dd></div>
+      <div><dt>Gasta SP, si quieres</dt><dd>Compra nodos del Ascension Tree en tu orden después de cada ascensión.</dd></div>
+    </dl>
+
+    <div class="gallery">
+      <figure>
+        <img src="../images/gameplay.png" width="790" height="380" alt="El bot corriendo por las colinas mientras aparece una caja plateada" loading="lazy">
+        <figcaption>Vigila todo el tiempo las cajas, las Megahordes y las quests.</figcaption>
+      </figure>
+      <figure>
+        <img src="../images/ui-settings.png" width="1060" height="700" alt="La página de ajustes, con cada opción explicada" loading="lazy">
+        <figcaption>Cada ajuste está explicado con palabras simples.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <div class="never">
+      <h2>Lo que nunca hace</h2>
+      <ul>
+        <li>Leer o cambiar la memoria, los archivos, las partidas guardadas o el tráfico de red del juego. Solo ve píxeles y envía teclas y clics.</li>
+        <li>Gastar jewels. Cuestan dinero real, así que cierra cualquier oferta que los pida.</li>
+        <li>Hacer un Ultra Ascend.</li>
+        <li>Gastar tus Slayer Points en el Ascension Tree, salvo que actives esa opción.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Cómo empezar</h2>
+    <div class="steps">
+      <div>
+        <h3>Prepara el juego</h3>
+        <ul>
+          <li>En ventana a <strong>1280x720</strong> y con el juego en inglés.</li>
+          <li>Salto en la <strong>flecha arriba</strong> y boost en la <strong>flecha derecha</strong>.</li>
+          <li><em>Custom cursor</em>, <em>portal dialogue</em> y <em>scientific notation</em> desactivados.</li>
+          <li><em>Rounded bulk</em> y <em>hide locked quest rewards</em> activados.</li>
+          <li>No compres el Vertical Magnet.</li>
+        </ul>
+        <p class="note">El bot lee estos ajustes en el primer inicio de cada día y te avisa si alguno está mal.</p>
+      </div>
+      <div>
+        <h3>Linux</h3>
+        <ol>
+          <li>Descarga el <code>linux-x64.tar.gz</code> y descomprímelo.</li>
+          <li>Ejecuta <code>./install.sh</code> en la carpeta <code>IdleRunner</code>. Agrega Idle Runner al menú de aplicaciones.</li>
+          <li>Abre Idle Runner y pulsa Start.</li>
+        </ol>
+        <p class="note">Ubuntu 22.04, Fedora 36 o más nuevo, con la versión de Steam del juego para Linux.</p>
+      </div>
+      <div>
+        <h3>Windows</h3>
+        <ol>
+          <li>Descarga el <code>windows-x64.zip</code> y descomprímelo.</li>
+          <li>Haz doble clic en <code>IdleRunner.exe</code> y pulsa Start.</li>
+        </ol>
+        <p class="note">La aplicación no tiene firma de código, así que Windows puede decir que protegió tu PC. Elige <em>Más información</em> y luego <em>Ejecutar de todas formas</em>.</p>
+      </div>
+    </div>
+    <p class="note">¿Algo no funciona? <a href="https://github.com/santiguti/idle-slayer-bot/blob/main/README.es.md">El README</a> tiene consejos para resolver problemas, y puedes <a href="https://github.com/santiguti/idle-slayer-bot/issues/new/choose">reportar un problema</a>.</p>
+  </section>
+
+  <footer>
+    <p class="support">Idle Runner es gratis. Si te ahorra unos cuantos clics, puedes <a href="https://ko-fi.com/santiguti">invitarme un café en Ko-fi</a>.</p>
+    <p><a href="https://github.com/santiguti/idle-slayer-bot">Código fuente en GitHub</a>, con licencia MIT. Empezó como una versión para Linux del script de AutoIt <a href="https://github.com/Devil4ngle/Idle_Slayer_Script">Idle Runner</a> de Devil4ngle.</p>
+    <p>Idle Slayer es un juego de Pablo Leban. Este proyecto no está afiliado al juego ni a su desarrollador, ni cuenta con su aval. Úsalo bajo tu propio riesgo.</p>
+  </footer>
+</main>
+
+<script>
+  // The language switch: remember the visitor's pick, so the English page doesn't send them back here.
+  for (const link of document.querySelectorAll("[data-lang]")) {
+    link.addEventListener("click", () => { try { localStorage.setItem("lang", link.dataset.lang); } catch (e) {} });
+  }
+
+  // Point the buttons straight at the newest release's files. Without the API (offline, rate limit) they keep
+  // linking to the Releases page.
+  const windows = /Windows/.test(navigator.userAgent);
+  const primary = document.getElementById("primary");
+  const secondary = document.getElementById("secondary");
+  if (windows) {
+    primary.textContent = "Descargar para Windows";
+    secondary.textContent = "o para Linux";
+  }
+  fetch("https://api.github.com/repos/santiguti/idle-slayer-bot/releases?per_page=10")
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(releases => {
+      const release = releases.find(r => !r.draft && r.assets.length);
+      if (!release) return;
+      const asset = suffix => release.assets.find(a => a.name.endsWith(suffix));
+      const linux = asset("-linux-x64.tar.gz"), win = asset("-windows-x64.zip");
+      const [forPrimary, forSecondary] = windows ? [win, linux] : [linux, win];
+      if (forPrimary) primary.href = forPrimary.browser_download_url;
+      if (forSecondary) secondary.href = forSecondary.browser_download_url;
+      const mb = forPrimary ? `, ${Math.round(forPrimary.size / 1e6)} MB` : "";
+      document.getElementById("fine").textContent =
+        `Versión ${release.tag_name.replace(/^v/, "")}${mb}. Gratis y de código abierto. Para la versión de Steam de Idle Slayer.`;
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>

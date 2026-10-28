@@ -8,6 +8,8 @@
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab">
 </p>
 
+<p align="center"><b>English</b> | <a href="README.es.md">Español</a></p>
+
 # Idle Runner
 
 **An Idle Slayer bot for Linux and Windows.** It plays [Idle Slayer](https://store.steampowered.com/app/1353300/Idle_Slayer/) for you. It jumps, collects boxes, buys upgrades, plays the minigames, ascends when it's worth it and spends your Slayer Points on the Ascension Tree.
@@ -74,7 +76,7 @@ python3 -m venv .venv
 - Enable *rounded bulk* and *hide locked quest rewards*.
 - Don't buy the **Vertical Magnet**.
 
-At start the bot opens the game's Settings, reads these options (it only reads them, then presses Cancel) and lists any that are wrong on the Activity page.
+At the first start of each day the bot opens the game's Settings, reads these options (it only reads them, then presses Cancel) and lists any that are wrong on the Activity page. Once they're all right it doesn't look again that day; **Check game settings now** on the Settings page makes it look again.
 
 **3. Start it:** `idle-runner` (or `.venv/bin/python -m idle_runner`) opens the window.
 
@@ -137,7 +139,7 @@ The first time the bot presses a key, KDE Plasma on Wayland asks whether to allo
 | 🔧 **Never gets stuck** | A screen that never shows up is logged with a screenshot and skipped. After 5 errors in a row it stops safely. |
 | 📼 **Black box** | Keeps the last hour of gameplay. Press **Mark problem** and that moment is saved for good. |
 | 📐 **Window check** | Pauses with a warning while the window isn't 1280x720. |
-| 🧪 **Automated tests** | Over 200 tests, many replaying real game screenshots. |
+| 🧪 **Automated tests** | Over 400 tests, many replaying real game screenshots. |
 
 <details>
 <summary>All the details</summary>
@@ -152,7 +154,7 @@ The first time the bot presses a key, KDE Plasma on Wayland asks whether to allo
 - **Random Box:** if a silver or orange box shows up while shopping or claiming quests, the bot stops, lets the jumper grab it and buys again shortly after.
 - **After an ascension:** the coin counter is read, and the bot buys as soon as it shows 6 coins (the sword's first level), by the bot's ascension or yours. Then buying restarts at `post_ascend_first_buy_seconds` (default 15 s) and the wait doubles up to `auto_buy_minutes`.
 - **Ascend by %:** every `ascend_bonus_sample_minutes` the bot opens the Ascension tab and reads the button's "+X% CpS bonus" (SP gained by ascending ÷ SP earned so far). With `auto_ascend_percent` set, it ascends at the first reading that reaches it; `auto_ascend_minutes` stays as the cap. A bonus it can't read is logged with a screenshot, never guessed.
-- **Ascension Tree:** with `auto_buy_tree`, the bot zooms the tree all the way out (where every node has a fixed place), then clicks the nodes in the order of `tree_order` (see Settings). Bought nodes are skipped; it stops at the first node it can't buy. It runs at start, after each ascension by the bot, and after one by hand. Restart the bot after an Ultra Ascension by hand.
+- **Ascension Tree:** with `auto_buy_tree`, the bot zooms the tree all the way out (where every node has a fixed place), then clicks the nodes in the order of `tree_order` (see Settings). Bought nodes are skipped and remembered between starts (in `state.json`, next to `config.toml`); each run first opens the last one remembered, without buying, and forgets them all if an Ultra Ascension reset the tree. It stops at the first node it can't buy. It runs at start, after each ascension by the bot, and after one by hand.
 - **Minions:** at start, after each tree run and when a mission it started should be over, the bot claims the minions back from their missions and sends every minion whose mission your unspent SP covers. It knows each mission's length from its cost (the wiki's table); tick the Divinities that speed missions up (Work Benefits, Improved Work Conditions, Greeks Blessing) on the Settings page. Missions it didn't start are looked at every hour. It reads the mission's cost on the button and your SP in the header first, so the game never gets to offer jewels for the rest.
 - **Bonus Stage 1** (while the tree's "Bonus Stage 2" node isn't bought) is skipped: the bot lets its first section run out and closes it.
 - One-shot crafts (Dimensional/Bidimensional staff) apply once per run. The portal rotation restarts from `circle_portals_count`.

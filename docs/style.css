@@ -1,0 +1,147 @@
+/* Shared by the English (index.html) and Spanish (es/index.html) pages. */
+/* The banner's palette: sky, grass, gravel, coin gold and the navy of its outlines. */
+:root {
+  --sky-top: #1fa3e8;
+  --sky-bottom: #7fd6ff;
+  --grass: #6cc96a;
+  --gravel: #8a8f98;
+  --gravel-dark: #6d727b;
+  --gold: #f5c542;
+  --gold-light: #ffe28a;
+  --navy: #0b3954;
+  --page: #f3f9fd;
+  --text: #0b3954;
+  --muted: #3d6680;
+  --rule: #c9dfec;
+  --pixel: "Pixelify Sans", "DejaVu Sans Mono", monospace;
+  --body: "Atkinson Hyperlegible", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0a2233;
+    --text: #e3f1fa;
+    --muted: #9dbdd2;
+    --rule: #1d4560;
+  }
+}
+:root[data-theme="dark"] { --page: #0a2233; --text: #e3f1fa; --muted: #9dbdd2; --rule: #1d4560; }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 1.0625rem/1.6 var(--body);
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 16px; }
+
+/* Hero: the game's world, with the ground scrolling under it as if running. */
+.sky {
+  position: relative;
+  background: linear-gradient(var(--sky-top), var(--sky-bottom));
+  color: var(--navy);
+  overflow: hidden;
+}
+.cloud { position: absolute; background: #fff; opacity: .85; }
+.cloud::before, .cloud::after { content: ""; position: absolute; background: inherit; }
+.cloud { width: 120px; height: 24px; }
+.cloud::before { width: 64px; height: 20px; left: 24px; top: -20px; }
+.cloud::after { width: 170px; height: 16px; left: -20px; top: 24px; }
+.c1 { left: 6%; top: 60px; }
+.c2 { right: 8%; top: 44px; transform: scale(1.15); }
+.c3 { left: 52%; top: 26px; transform: scale(.7); }
+
+.hero { position: relative; padding: 112px 16px 72px; max-width: 68rem; margin: 0 auto; }
+/* The language switch, top right over the sky. */
+.lang { position: absolute; top: 24px; right: 16px; margin: 0; font: 700 1.05rem/1 var(--pixel); }
+.lang a, .lang strong { color: var(--navy); padding: 4px 2px; }
+.lang strong { border-bottom: 3px solid var(--navy); }
+h1 {
+  font: 700 clamp(3rem, 9vw, 6.5rem)/0.95 var(--pixel);
+  margin: 0;
+  color: #fff;
+  text-shadow: 5px 5px 0 var(--navy);
+  letter-spacing: -0.01em;
+}
+.lede { font-size: 1.3rem; line-height: 1.45; max-width: 34ch; margin: 20px 0 32px; font-weight: 700; }
+
+.download { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.btn {
+  display: inline-block;
+  font: 700 1.35rem/1 var(--pixel);
+  color: var(--navy);
+  background: var(--gold);
+  border: 4px solid var(--navy);
+  box-shadow: 6px 6px 0 var(--navy);
+  padding: 18px 26px 16px;
+  text-decoration: none;
+  transition: transform .08s, box-shadow .08s;
+}
+.btn:hover { background: var(--gold-light); }
+.btn:active { transform: translate(4px, 4px); box-shadow: 2px 2px 0 var(--navy); }
+.alt { font-weight: 700; }
+.fine { margin: 16px 0 0; font-size: .95rem; max-width: 52ch; }
+
+.ground { position: relative; height: 72px; background: var(--grass); }
+.ground::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: 0; height: 48px;
+  background:
+    linear-gradient(var(--gravel-dark) 6px, transparent 6px),
+    repeating-linear-gradient(90deg, transparent 0 40px, var(--gravel-dark) 40px 100px, transparent 100px 200px),
+    var(--gravel);
+  background-size: 100% 100%, 400px 4px, 100% 100%;
+  background-position: 0 0, 0 22px, 0 0;
+  background-repeat: no-repeat, repeat-x, no-repeat;
+  animation: run 2.4s linear infinite;
+}
+@keyframes run { to { background-position: 0 0, -400px 22px, 0 0; } }
+@media (prefers-reduced-motion: reduce) { .ground::after { animation: none; } .btn { transition: none; } }
+
+/* The app window sits on the ground line. */
+.shot { margin-top: -40px; position: relative; }
+.shot img { border: 4px solid var(--navy); box-shadow: 10px 10px 0 var(--navy); width: 100%; max-width: 60rem; margin: 0 auto; }
+.shot p { text-align: center; color: var(--muted); margin: 20px auto 0; max-width: 60ch; }
+
+section { padding: 72px 0 0; }
+h2 { font: 700 2.1rem/1.1 var(--pixel); margin: 0 0 24px; }
+h3 { font: 700 1.3rem/1.2 var(--pixel); margin: 0 0 12px; }
+
+.intro { color: var(--muted); margin: -12px 0 24px; max-width: 60ch; }
+.does { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 0 48px; margin: 0; }
+.does div { border-top: 2px solid var(--rule); padding: 14px 0 16px; }
+.does dt { font-weight: 700; }
+.does dd { margin: 2px 0 0; color: var(--muted); }
+
+.gallery { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-top: 40px; align-items: start; }
+.gallery img { border: 3px solid var(--navy); }
+.gallery figcaption { color: var(--muted); font-size: .95rem; margin-top: 8px; }
+.gallery figure { margin: 0; }
+
+/* The promises: the navy of the banner's labels, with the coin gold. */
+.never { background: var(--navy); color: #e3f1fa; padding: 40px clamp(20px, 5vw, 56px); border-left: 8px solid var(--gold); }
+.never h2 { color: var(--gold); }
+.never ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.never li { padding-left: 28px; position: relative; max-width: 60ch; }
+.never li::before { content: ""; position: absolute; left: 0; top: .45em; width: 12px; height: 12px; background: var(--gold); }
+
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 32px 48px; }
+.steps ol, .steps ul { margin: 0; padding-left: 1.4em; }
+.steps li { margin-bottom: 8px; }
+.steps li::marker { font-family: var(--pixel); font-weight: 700; }
+code { font: .92em/1.4 ui-monospace, "DejaVu Sans Mono", monospace; background: var(--rule); padding: 1px 5px; overflow-wrap: anywhere; }
+.note { color: var(--muted); font-size: .95rem; margin-top: 12px; }
+
+footer { margin-top: 88px; border-top: 2px solid var(--rule); padding: 32px 0 48px; color: var(--muted); font-size: .95rem; }
+footer p { margin: 0 0 10px; max-width: 70ch; }
+footer .support { color: var(--text); font-size: 1.05rem; }
+
+@media (max-width: 40rem) {
+  .hero { padding-top: 88px; }
+  .gallery { grid-template-columns: 1fr; }
+  .shot img { box-shadow: 6px 6px 0 var(--navy); }
+}

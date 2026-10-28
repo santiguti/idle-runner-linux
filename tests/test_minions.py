@@ -206,3 +206,38 @@ def test_each_mission_cost_tells_its_length() -> None:
     assert [mission_ms(cost, Settings()) for cost in (10, 150, 1_000, 1_500, 3_000)] == [
         m * 60_000 for m in (180, 390, 180, 270, 1_380)]
     assert mission_ms(42, Settings()) is None
+
+
+def test_minions_right_after_the_tree_reuse_its_open_panel(game, fake, monkeypatch) -> None:
+    # The tree leaves the panel open; the ascension button there is the tree's "Buy on Click" toggle.
+    sent = play_minions_tab(fake, monkeypatch, available=526)
+    fake.paint(538, 681, 0xAD1111)  # the panel's X tab: open, on the tree tab
+    fake.paint(260, 480, 0x58188D)  # what the Ascension tab shows once clicked
+    send_minions(game)
+
+    assert (95, 90) not in fake.clicks()
+    assert fake.clicks()[0] == (93, 680) and sent == [10, 150]
+
+
+def test_waits_for_the_minions_tab_to_fade_in(game, fake, monkeypatch) -> None:
+    # Live 2026-10-28 02:43: right after the tree, the Ascension and Minions tab clicks came 28 ms apart; the
+    # Minions list showed, but 200 ms after the click its tab wasn't the selected shade yet.
+    sent = play_minions_tab(fake, monkeypatch, available=526)
+    act, grab, due = fake.on_action, fake.grab, []
+
+    def tab_late(action: tuple) -> None:
+        if action[0] == "click" and (action[1] + OFFSET[0], action[2] + OFFSET[1]) == (332, 680):
+            due.append(fake.t + 400)
+            return
+        act(action)
+
+    def grab_late(x: int, y: int, w: int, h: int):
+        if due and fake.t >= due[0]:
+            due.clear()
+            show_panel(fake, "send-526")
+        return grab(x, y, w, h)
+
+    fake.on_action, fake.grab = tab_late, grab_late
+    send_minions(game)
+
+    assert sent == [10, 150]

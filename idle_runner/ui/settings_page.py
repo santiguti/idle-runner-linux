@@ -50,7 +50,8 @@ class ScrollFrame(ttk.Frame):
 
 
 class SettingsPage(ttk.Frame):
-    def __init__(self, parent: tk.Misc, config_path: Path, on_saved: Callable[[Settings], None]) -> None:
+    def __init__(self, parent: tk.Misc, config_path: Path, on_saved: Callable[[Settings], None],
+                 on_check_game: Callable[[], None]) -> None:
         super().__init__(parent)
         self.config_path, self.on_saved = config_path, on_saved
         self.settings = Settings()
@@ -69,6 +70,12 @@ class SettingsPage(ttk.Frame):
 
         self.message = ttk.Label(self, wraplength=700, justify="left")
         self.message.pack(anchor="w", fill="x")
+        game = ttk.Frame(self)
+        game.pack(fill="x", pady=(0, 12), padx=(2, 14))
+        ttk.Label(game, text="The bot checks Idle Slayer's own settings at the first Start of each day.",
+                  style="Muted.TLabel").pack(side="left")
+        self.check_button = ttk.Button(game, text="Check game settings now", command=on_check_game)
+        self.check_button.pack(side="right")
         scroll = ScrollFrame(self)
         scroll.pack(fill="both", expand=True)
         for card in CARDS:

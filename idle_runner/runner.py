@@ -1,7 +1,10 @@
 """The main loop, ported from Main() in Idle Runner.au3: fast checks every ~40 ms, slow checks every 5 s."""
 import dataclasses
 import signal
+import threading
 from collections.abc import Callable
+from datetime import date
+from pathlib import Path
 
 from idle_runner.actions import (BIDIMENSIONAL_STAFF, DIMENSIONAL_STAFF, RAGE_PILL, SOUL_COMPASS,
                                  buy_temp_item, close_all, soul_bonus_active)
@@ -18,6 +21,7 @@ from idle_runner.minigames.ascending_heights import ascending_heights
 from idle_runner.portals import portal_ready, take_portal
 from idle_runner.repeater import Repeater
 from idle_runner.shop import Shop
+from idle_runner.state import load_state, update_state
 from idle_runner.tree import Tree
 from idle_runner.game import GameUnavailable, WindowGone
 
@@ -39,15 +43,17 @@ def install_stop_signals() -> None:
 
 
 class Runner:
-    def __init__(self, game: Game, settings: Settings, jumper: Repeater) -> None:
+    def __init__(self, game: Game, settings: Settings, jumper: Repeater, state: Path | None = None) -> None:
         self.game = game
         self.s = settings
         self.jumper = jumper
+        self.state = state  # state.json: what the bot remembers between starts
         self.shop = Shop(game)
-        self.tree = Tree(game, settings.tree_order)
+        self.tree = Tree(game, settings.tree_order, state)
         self.tree_due = settings.auto_buy_tree  # once at start: the user may have ascended by hand
         self.minions_due = True  # once at start too: the node may have been bought by hand
-        self.settings_due = True  # the in-game settings the bot needs, once at start
+        self.settings_due = True  # the in-game settings the bot needs, at the first start of the day
+        self.settings_request = threading.Event()  # set by the window's "Check game settings now"
         now = game.now()
         self.timer_minions = now
         self.minions_back: list[float] = []  # when the missions the bot sent end
@@ -163,9 +169,16 @@ class Runner:
         if g.now() - self.last_slow >= 5000:
             self.last_slow = g.now()
             close_all(g)
-            if self.settings_due:  # not in the original, which only listed them
+            asked = self.settings_request.is_set()
+            if self.settings_due or asked:  # not in the original, which only listed them
                 self.settings_due = False
-                self._routine("check_game_settings", lambda: check_game_settings(g, self.shop))
+                self.settings_request.clear()
+                today = date.today().isoformat()
+                if not asked and load_state(self.state).get("settings_ok_date") == today:
+                    event("Game settings check skipped", reason="checked today")
+                else:  # the date is kept only while nothing is wrong or missing: until then, every start checks
+                    ok = self._routine("check_game_settings", lambda: check_game_settings(g, self.shop))
+                    update_state(self.state, settings_ok_date=today if ok else None)
             if g.pixel_is(660, 254, 0xFFE737) and g.pixel_is(638, 236, 0xFFBB31):  # bonus stage
                 self._routine("bonus_stage", lambda: bonus_stage(g, s.skip_bonus_stage))
             if (g.pixel_is(639, 224, 0xFF878A) and g.pixel_is(634, 224, 0xF263BD)

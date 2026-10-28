@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.1.1 (2026-10-28)
+
+### New
+- **A quicker start that says what it's doing.** A second Start on the same day spends about 3 seconds in the game's menus instead of about 30. The dashboard now says what the bot is doing ("Checking the Ascension Tree…", "Shopping…") and the activity feed shows each result: "Game settings OK", "Tree: next is Safety First, not enough SP", "Minions: not enough SP to send one".
+- **The tree remembers what's bought.** Bought nodes are kept in `state.json`, next to `config.toml`, so a restart doesn't walk the whole tree again. Each run first opens the last node it remembers, without buying, and forgets them all if an Ultra Ascension reset the tree. You no longer need to restart the bot after an Ultra Ascension by hand.
+- **The game's settings are checked once a day.** Once they're all right the bot doesn't open them again until the next day. **Check game settings now** on the Settings page checks them again.
+- **The website and the README in Spanish.** The [project page](https://santiguti.github.io/idle-slayer-bot/) opens in Spanish for browsers set to Spanish, with an English · Español switch that remembers your pick, and there's a `README.es.md`. The window itself is still in English, for now.
+
+### Fixed
+- **The minions were missed right after the tree.** The bot clicked the Minions tab while the tree's tab was still fading out and gave up 200 ms later ("Minions tab not shown"). It now waits up to 2 seconds for the tab, and visits the tree and the minions in one opening of the ascension panel.
+
 ## v2.0.0 (2026-10-28)
 
 **Windows is out of beta**: the same bot, tested with the real game on Windows and on Linux. Download the Windows zip or the Linux `tar.gz` below; no Python needed. Changes since v2.0.0-rc2:

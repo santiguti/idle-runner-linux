@@ -59,7 +59,7 @@ def play_settings(fake, at33=AT33, at39=AT39) -> None:
 
 def test_checks_the_settings_and_only_cancels(game, fake, events) -> None:
     play_settings(fake)
-    check_game_settings(game, Shop(game))
+    assert check_game_settings(game, Shop(game))  # all found and right
 
     names = [r["event"] for r in events()]
     assert "Game setting wrong" not in names and "Game setting not found" not in names
@@ -74,7 +74,7 @@ def test_reports_a_wrong_setting(game, fake, events) -> None:
     at33[375:420, 365:440][(at33[375:420, 365:440] == (0x1D, 0xD7, 0x00)).all(axis=2)] = (0x39, 0x39, 0x39)
     at33[380:415, 368:410] = (0xF8, 0x33, 0x08)
     play_settings(fake, at33=at33)
-    check_game_settings(game, Shop(game))
+    assert not check_game_settings(game, Shop(game))
 
     wrong = [r for r in events() if r["event"] == "Game setting wrong"]
     assert [(r["setting"], r["should_be"]) for r in wrong] == [("Rounded bulk buy", "on")]
@@ -83,7 +83,7 @@ def test_reports_a_wrong_setting(game, fake, events) -> None:
 def test_a_list_it_cannot_read_reports_every_setting_missing(game, fake, events) -> None:
     # E.g. the game in another language: no label matches.
     play_settings(fake, at33=TOP, at39=TOP)
-    check_game_settings(game, Shop(game))
+    assert not check_game_settings(game, Shop(game))
 
     missing = [r["setting"] for r in events() if r["event"] == "Game setting not found"]
     assert len(missing) == 5
@@ -100,7 +100,7 @@ def test_without_the_menu_nothing_is_clicked_inside_it(game, fake, events) -> No
         real(action)
 
     fake.on_action = menu_never_opens
-    check_game_settings(game, Shop(game))
+    assert not check_game_settings(game, Shop(game))
 
     assert (930, 558) not in fake.clicks()
     assert any(r["event"] == "Game settings not checked" for r in events())

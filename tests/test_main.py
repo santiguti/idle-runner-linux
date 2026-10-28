@@ -117,3 +117,21 @@ def test_frozen_main_runs_from_the_exe_folder(monkeypatch, tmp_path) -> None:
 
     assert os.getcwd() == str(folder)
     assert sys.stdout is not None and sys.stderr is not None
+
+
+def test_run_from_the_window_keeps_its_state_next_to_the_config_and_takes_its_commands(tmp_path, monkeypatch) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text("[debug]\nblackbox_fps = 0\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(main_module, "open_backend", lambda name: FakeBackend())
+    monkeypatch.setattr(main_module, "install_stop_signals", lambda: None)
+    monkeypatch.setattr(main_module, "single_instance", lambda: types.SimpleNamespace(close=lambda: None))
+    runners, watched = [], []
+    monkeypatch.setattr(main_module.Runner, "run", lambda self: runners.append(self))
+    monkeypatch.setattr(main_module, "stop_on_stdin_eof", lambda stream, commands: watched.append(commands))
+
+    assert main_module.main(["run", "--config", str(config), "--stop-on-stdin-eof"]) == 0
+    runner = runners[0]
+    assert runner.state == tmp_path / "state.json"
+    watched[0]["check-settings"]()
+    assert runner.settings_request.is_set()

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from idle_runner.state import load_state, update_state
 from idle_runner.tree import Tree
 from idle_runner.tree_nodes import NODES, RECOMMENDED_ORDER
 from tests.fakes import OFFSET, read_png
@@ -70,6 +71,8 @@ class FakeTree:
         if (x, y) == (95, 90):  # the panel opens on its Ascension tab
             self.panel_open = True
             self.fake.paint(538, 681, 0xAD1111)
+            self.fake.paint(260, 480, 0x58188D)
+        elif (x, y) == (93, 680) and self.panel_open:  # the Ascension tab of an open panel
             self.fake.paint(260, 480, 0x58188D)
         elif (x, y) == (205, 696):
             self.fake.paint(158, 676, 0x5E261B)  # tree tab selected
@@ -148,7 +151,8 @@ def test_buys_in_order_skips_bought_and_locked_nodes_and_stops_without_enough_sp
     assert tree.bought == {name(0), name(1), name(3)}
     assert [r["node"] for r in events() if r["event"] == "Tree node bought"] == [name(1), name(3)]
     assert name(5) not in nodes_clicked(fake)  # stopped at name(4): wait for SP, in the wiki's order
-    assert fake.clicks()[-1] == (570, 694)  # the panel is closed again
+    # The panel stays open: the runner sends the minions right after, and send_minions closes it.
+    assert (570, 694) not in fake.clicks() and tree.panel_open
 
 
 def test_a_locked_node_is_checked_again_only_after_a_purchase(game, fake) -> None:
@@ -163,7 +167,7 @@ def test_a_locked_node_is_checked_again_only_after_a_purchase(game, fake) -> Non
     tree.buy()  # buys name(1), which may have unlocked name(0)
     fake.actions.clear()
     tree.buy()
-    assert nodes_clicked(fake)[0] == name(0)
+    assert nodes_clicked(fake)[:2] == [tree.bought[-1], name(0)]  # right after the memory's check
 
 
 def test_zooms_all_the_way_out_before_clicking_a_node(game, fake) -> None:
@@ -216,14 +220,64 @@ def test_a_bought_node_is_recognised_from_its_tooltip_without_opening_it(game, f
     assert fake.t - start < 5_000
 
 
-def test_bought_nodes_are_not_checked_again_in_the_next_run(game, fake) -> None:
-    FakeTree(fake, bought={name(0)}, poor={name(1)})
+def test_only_the_last_bought_node_is_checked_again_in_the_next_run(game, fake) -> None:
+    FakeTree(fake, bought={name(0), name(1)}, poor={name(2)})
     tree = Tree(game, RECOMMENDED_ORDER)
     tree.buy()
     fake.actions.clear()
     tree.buy()
 
+    assert nodes_clicked(fake) == [name(1), name(2)]  # the memory's check, then the next node
     assert [a for a in fake.actions if a[0] == "move" and (a[1] + 8, a[2] + 31) == ORDER[0][1]] == []
+
+
+def test_bought_nodes_are_remembered_between_starts(game, fake, tmp_path, event_names) -> None:
+    # Every Start walked the whole order again: 23 s at 10-28 02:07, against 3.6 s later in the same run.
+    state = tmp_path / "state.json"
+    FakeTree(fake, bought={name(0), name(1)}, poor={name(2)})
+    Tree(game, RECOMMENDED_ORDER, state).buy()
+    assert load_state(state)["tree_bought"] == [name(0), name(1)]
+
+    fake.actions.clear()
+    start = fake.t
+    Tree(game, RECOMMENDED_ORDER, state).buy()  # the bot started again
+
+    assert nodes_clicked(fake) == [name(1), name(2)]
+    assert [a for a in fake.actions if a[0] == "move" and (a[1] + 8, a[2] + 31) == ORDER[0][1]] == []
+    assert "Tree memory cleared" not in event_names()
+    assert fake.t - start < 5_000
+
+
+def test_an_ultra_ascension_clears_the_memory_without_buying_anything(game, fake, tmp_path, event_names) -> None:
+    # An Ultra Ascension resets the tree: the last node remembered shows Buy again. Its modal is only read.
+    state = tmp_path / "state.json"
+    update_state(state, tree_bought=[name(0), name(1)])
+    tree_ui = FakeTree(fake, poor={name(0)})  # name(1) is affordable: a Buy click would buy it
+    Tree(game, RECOMMENDED_ORDER, state).buy()
+
+    assert "Tree memory cleared" in event_names()
+    assert (534, 582) not in fake.clicks() and tree_ui.bought == set()
+    assert nodes_clicked(fake) == [name(1), name(0)]  # the check, then the order from its start
+    assert load_state(state)["tree_bought"] == []
+
+
+def test_the_memory_is_checked_on_every_run(game, fake, event_names) -> None:
+    tree_ui = FakeTree(fake, bought={name(0)}, poor={name(1)})
+    tree = Tree(game, RECOMMENDED_ORDER)
+    tree.buy()
+    tree_ui.bought.clear()  # an Ultra Ascension by hand while the bot runs
+    tree_ui.poor.add(name(0))  # and no SP left for it
+    tree.buy()
+
+    assert "Tree memory cleared" in event_names()
+    assert tree.bought == []
+
+
+def test_names_no_longer_in_the_tree_are_dropped_from_the_memory(game, tmp_path) -> None:
+    state = tmp_path / "state.json"
+    update_state(state, tree_bought=["Moon Boots", name(0), 7])
+
+    assert Tree(game, RECOMMENDED_ORDER, state).bought == [name(0)]
 
 
 def test_nothing_is_clicked_in_the_tree_when_its_tab_does_not_show(game, fake, event_names) -> None:

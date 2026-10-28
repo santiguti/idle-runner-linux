@@ -168,3 +168,46 @@ def test_tail_skips_lines_that_are_not_json_objects(tmp_path: Path) -> None:
     path = tmp_path / "events.jsonl"
     path.write_text('{"event": "a"}\nnot json\n[1, 2]\n\n{"event": "b"}\n', encoding="utf-8")
     assert [r["event"] for r in EventTail(path).read_new()] == ["a", "b"]
+
+
+@pytest.mark.parametrize(("routine", "doing"), [
+    ("check_game_settings", "Checking the game's settings"), ("buy_tree", "Checking the Ascension Tree"),
+    ("send_minions", "Checking the minions"), ("auto_upgrade", "Shopping"), ("claim_quests", "Claiming quests"),
+    ("ascend_bonus_sample", "Reading the ascension bonus"), ("auto_ascend", "Ascending"),
+    ("circle_portals", "Taking a portal"), ("bonus_stage", "Playing Bonus Stage"),
+    ("chest_hunt", "Playing Chest Hunt"), ("boss_knight", "Playing Knight boss fight"),
+    ("boss_victor", "Playing Victor boss fight"), ("ascending_heights", "Playing Ascending Heights"),
+    ("rage_when_horde", ""),  # 11 ms, ~45 times in 2 s at a Megahorde: it would only flicker
+])
+def test_the_routine_running_is_what_the_bot_is_doing(routine: str, doing: str) -> None:
+    s = Session()
+    apply(s, {"event": "routine_start", "name": routine})
+    assert s.doing == doing
+
+
+@pytest.mark.parametrize("end", [{"event": "routine_end", "name": "buy_tree", "ms": 5},
+                                 {"event": "routine_abort", "name": "buy_tree", "ms": 5},
+                                 {"event": "tick_crash", "in_a_row": 1}, {"event": "Bot stopped"},
+                                 {"event": "Bot started"}])
+def test_the_bot_is_doing_nothing_once_the_routine_ends(end: dict) -> None:
+    s = Session()
+    apply(s, {"event": "routine_start", "name": "buy_tree"})
+    apply(s, end)
+    assert s.doing == ""
+
+
+def test_results_of_the_start_checks() -> None:
+    for record, expected in [
+        ({"event": "Game settings checked", "wrong": [], "missing": []}, ("state", "Game settings OK")),
+        ({"event": "Game settings check skipped", "reason": "checked today"},
+         ("state", "Game settings: already checked today")),
+        ({"event": "Tree stopped", "node": "Safety First", "reason": "not enough SP"},
+         ("tree", "Tree: next is Safety First, not enough SP")),
+        ({"event": "Tree stopped", "node": "Safety First", "reason": "no modal"},
+         ("tree", "Tree stopped at Safety First: no modal")),
+        ({"event": "Minion not sent", "reason": "not enough SP", "cost": 150, "available": 20},
+         ("buy", "Minions: not enough SP to send one (150 SP)")),
+    ]:
+        assert describe(record) == expected, record
+    # A wrong or missing setting already shows as a problem of its own.
+    assert describe({"event": "Game settings checked", "wrong": ["Rounded bulk buy"], "missing": []}) is None

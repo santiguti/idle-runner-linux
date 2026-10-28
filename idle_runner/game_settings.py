@@ -1,4 +1,5 @@
-"""Check the in-game settings the bot needs, once at start. Not in the original, which only listed them.
+"""Check the in-game settings the bot needs, at the first Start of each day (the runner keeps the date). Not
+in the original, which only listed them.
 
 The settings are a dialog behind the shop's "⋮" tab (measured 2026-10-28): a list that always opens at its top
 and scrolls 50 px per wheel notch. A toggle shows a red cross (F83308) on its left when off and a green tick
@@ -86,12 +87,13 @@ def _close(game: Game) -> None:
             return
 
 
-def check_game_settings(game: Game, shop: Shop) -> None:
-    """Open the settings, read the ones the bot needs, close them with Cancel and log what's wrong."""
+def check_game_settings(game: Game, shop: Shop) -> bool:
+    """Open the settings, read the ones the bot needs, close them with Cancel and log what's wrong. True only
+    when every one was found and right."""
     shop.close_if_open()
     if not shop.open_shop():
         event("Game settings not checked", reason="shop not open")
-        return
+        return False
     game.click(1158, 696)  # the "⋮" tab: inside it in both tab bars (see shop.X_TAB_RED)
     button = None
     deadline = game.now() + 2000
@@ -104,7 +106,7 @@ def check_game_settings(game: Game, shop: Shop) -> None:
         event("Game settings not checked", reason="no Settings button")
         game.save_frame("settings-menu-not-shown")
         game.click(1244, 712)  # close the shop
-        return
+        return False
     game.click(*button)
     # The dialog grows from the middle as it opens: Apply reaches (428, 631) last (seen live, 2026-10-28).
     deadline = game.now() + 3000
@@ -113,7 +115,7 @@ def check_game_settings(game: Game, shop: Shop) -> None:
             event("Game settings not checked", reason="dialog not shown")
             game.save_frame("settings-dialog-not-shown")
             _close(game)
-            return
+            return False
         game.sleep(50)
     game.sleep(300)
     found: dict[str, bool] = {}
@@ -132,4 +134,6 @@ def check_game_settings(game: Game, shop: Shop) -> None:
         elif found[name] != needed:
             event("Game setting wrong", setting=name, should_be="on" if needed else "off")
             wrong.append(name)
-    event("Game settings checked", wrong=wrong, missing=[name for name in SETTINGS if name not in found])
+    missing = [name for name in SETTINGS if name not in found]
+    event("Game settings checked", wrong=wrong, missing=missing)
+    return not wrong and not missing

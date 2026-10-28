@@ -17,6 +17,7 @@ from idle_runner.game import Game, GameUnavailable, open_backend
 from idle_runner.log import setup_logging
 from idle_runner.repeater import Repeater
 from idle_runner.runner import Runner, install_stop_signals
+from idle_runner.state import state_path
 from idle_runner.stats import summarize
 
 
@@ -99,16 +100,17 @@ def run_bot(config_path: Path, stop_on_eof: bool = False) -> int:
     game = Game(backend, (settings.offset_x, settings.offset_y), settings.color_tolerance,
                 log_dir / "frames" if settings.save_frames else None)
     jumper = Repeater(game, ("Up", "Right"), settings.jump_interval_ms, "jumper")
+    runner = Runner(game, settings, jumper, state_path(config_path))
     install_stop_signals()
-    if stop_on_eof:
-        stop_on_stdin_eof(sys.stdin)
+    if stop_on_eof:  # the window's "Check game settings now" arrives as a line
+        stop_on_stdin_eof(sys.stdin, commands={"check-settings": runner.settings_request.set})
     recorder = None
     if settings.blackbox_fps:
         # It stops when this pipe closes: here, or by the OS if this process is killed outright.
         recorder = subprocess.Popen(self_command("blackbox", "--config", str(config_path), "--stop-on-stdin-eof"),
                                     stdin=subprocess.PIPE)
     try:
-        Runner(game, settings, jumper).run()
+        runner.run()
     finally:
         if recorder:
             recorder.stdin.close()

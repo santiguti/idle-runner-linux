@@ -89,7 +89,11 @@ def send_minions(game: Game) -> list[int]:
         game.click(570, 694)  # exit
         return sent
     game.click(332, 680)  # minions tab
-    game.sleep(200)
+    # Its shade fades in: 200 ms after the click it still hadn't when the tree had just switched tabs (live,
+    # 2026-10-28 02:43), so wait for it as Shop.tab_shown does.
+    deadline = game.now() + 2000
+    while game.pixel_search(332, 676, 332, 676, TAB_SELECTED, variation=6) is None and game.now() < deadline:
+        game.sleep(20)
     if game.pixel_search(332, 676, 332, 676, TAB_SELECTED, variation=6) is None:
         event("Minions tab not shown")
         game.click(570, 694)  # exit

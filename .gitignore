@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 logs/
 config.toml
+state.json
 probe.png
 
 # Development notes and plans: kept local

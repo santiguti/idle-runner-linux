@@ -36,3 +36,17 @@ def test_second_instance_is_refused() -> None:
 
     first.close()  # that bot stopped
     assert single_instance(port=port) is not None
+
+
+def test_a_command_line_on_stdin_runs_its_action_and_eof_still_stops() -> None:
+    read_fd, write_fd = os.pipe()
+    stopped, asked = threading.Event(), threading.Event()
+    stop_on_stdin_eof(os.fdopen(read_fd, encoding="utf-8"), stopped.set, {"check-settings": asked.set})
+    writer = os.fdopen(write_fd, "w", encoding="utf-8")
+
+    writer.write("something else\ncheck-settings\n")
+    writer.flush()  # the pipe stays open: the line must arrive without EOF
+
+    assert asked.wait(1) and not stopped.is_set()
+    writer.close()
+    assert stopped.wait(1)

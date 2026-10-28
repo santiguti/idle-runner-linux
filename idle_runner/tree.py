@@ -14,14 +14,20 @@ node that can be bought but costs more SP than there is stops the routine, so SP
 So Buy is clicked only after the node's tooltip showed its cost in green (enough SP), and that offer is
 closed at once if it shows anyway. Its jewel button needs its "I understand" box ticked first; nothing in
 the bot clicks that box.
+
+The nodes seen bought are remembered in state.json between starts (2026-10-28: a Start walked the whole
+order again, 23 s). Every run first opens the last one remembered, read-only: an Ultra Ascension resets the
+tree, and then that node shows Buy again and the memory is dropped.
 """
 from collections.abc import Sequence
+from pathlib import Path
 
 import numpy as np
 
 from idle_runner.actions import PANEL_X_RED, TAB_SELECTED, open_ascension_tab
 from idle_runner.game import Game
 from idle_runner.log import event
+from idle_runner.state import load_state, update_state
 from idle_runner.tree_nodes import NODES
 
 MODAL_STATE = (468, 571)
@@ -38,28 +44,48 @@ COST_RED = (0xAD, 0x11, 0x11)
 
 
 class Tree:
-    def __init__(self, game: Game, order: Sequence[str]) -> None:
+    def __init__(self, game: Game, order: Sequence[str], state: Path | None = None) -> None:
         self.game = game
         self.order = order  # node names from tree_nodes.NODES (Settings.tree_order)
-        # Nodes seen bought during this run of the bot, so they aren't clicked again. An Ultra Ascension by
-        # hand while the bot runs makes this stale: restart the bot after one.
-        self.bought: set[str] = set()
+        self.state = state  # state.json, where `bought` is kept between starts
+        # Nodes seen bought, in that order, so they aren't clicked again. Names no longer in NODES are dropped.
+        remembered = load_state(state).get("tree_bought")
+        self.bought: list[str] = [n for n in remembered if isinstance(n, str) and n in NODES] \
+            if isinstance(remembered, list) else []
         # Nodes seen locked ("Can't buy yet") since the last purchase: only a purchase unlocks a node.
         self.layout = "min"  # the tree's zoom (Node.layout), set by show_layout
         self.locked: set[str] = set()
 
     def buy(self) -> None:
-        g = self.game
-        if self.open_tree():
-            for name in self.order:
-                if name in self.bought | self.locked:
-                    continue
-                node = NODES[name]
-                if node.layout != self.layout:
-                    self.show_layout(node.layout)
-                if not self.buy_node(name, node.point):
-                    break
-        g.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
+        """Buy nodes in the order until one can't be bought. Leaves the panel open: the runner sends the minions
+        right after, and send_minions closes it (reopening it at once was lost on every start, 2026-10-28)."""
+        if not self.open_tree():
+            self.game.click(570, 694)  # close the panel (its X tab, as CollectMinion does)
+            return
+        if self.bought and not self.still_bought(self.bought[-1]):
+            event("Tree memory cleared", node=self.bought[-1])
+            self.bought.clear()
+        for name in self.order:
+            if name in self.bought or name in self.locked:
+                continue
+            node = NODES[name]
+            if node.layout != self.layout:
+                self.show_layout(node.layout)
+            if not self.buy_node(name, node.point):
+                break
+        update_state(self.state, tree_bought=self.bought)
+
+    def still_bought(self, name: str) -> bool:
+        """Open the node's modal and close it again, never pressing Buy: True if it shows bought."""
+        node = NODES[name]
+        if node.layout != self.layout:
+            self.show_layout(node.layout)
+        state = self.open_modal(node.point)
+        if state == "buy":
+            self.close_modal(758, 582)  # Close
+        elif state:
+            self.close_modal(648, 582)  # the wide "Close" / "Can't buy yet"
+        return state == "bought"
 
     def show_layout(self, layout: str) -> None:
         """Zoom the tree to one of its two fixed layouts (Node.layout). "min": all the way out, where every node
@@ -97,11 +123,11 @@ class Tree:
         g = self.game
         tooltip = self.tooltip(point)
         if tooltip == "unlocked":
-            self.bought.add(name)
+            self.bought.append(name)
             return True
         state = self.open_modal(point)
         if state == "bought":
-            self.bought.add(name)
+            self.bought.append(name)
             return self.close_modal(648, 582)  # its wide "Close" button
         if state == "locked":  # a prerequisite comes later in the wiki's order: go on
             self.locked.add(name)
@@ -124,7 +150,7 @@ class Tree:
         if self.jewel_offer_closed(name):
             return False
         if self.wait_modal_gone() and self.open_modal(point) == "bought":  # check it took
-            self.bought.add(name)
+            self.bought.append(name)
             self.locked.clear()  # it may have unlocked nodes earlier in the order
             event("Tree node bought", node=name)
             return self.close_modal(648, 582)

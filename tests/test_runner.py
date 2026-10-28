@@ -1,6 +1,7 @@
 import signal
 import time
 from dataclasses import replace
+from datetime import date
 
 import numpy as np
 import pytest
@@ -9,6 +10,7 @@ import idle_runner.runner as runner_module
 from idle_runner.config import Settings
 from idle_runner.game import Game
 from idle_runner.log import log
+from idle_runner.state import load_state, update_state
 from idle_runner.runner import (BOX_RETRY_MS, MAX_CONSECUTIVE_CRASHES, SIX_COIN_TIMEOUT_MS, WINDOW_RETRY_MS, Runner,
                                  install_stop_signals)
 from idle_runner.game import GameUnavailable, WindowGone
@@ -589,3 +591,58 @@ def test_the_game_settings_are_checked_once_at_start(game, fake, jumper, monkeyp
         runner.tick()
 
     assert len(checks) == 1
+
+
+def settings_checks(fake, monkeypatch, result: bool) -> list[float]:
+    checks: list[float] = []
+    monkeypatch.setattr(runner_module, "check_game_settings", lambda g, shop: checks.append(fake.t) is None and result)
+    monkeypatch.setattr(runner_module, "send_minions", lambda g: [])
+    return checks
+
+
+def test_game_settings_found_right_are_not_checked_again_the_same_day(game, fake, jumper, monkeypatch, tmp_path,
+                                                                      event_names) -> None:
+    state = tmp_path / "state.json"
+    checks = settings_checks(fake, monkeypatch, result=True)
+    runner = Runner(game, Settings(), jumper, state)
+    fake.t += 6_000
+    runner.tick()
+    assert len(checks) == 1 and load_state(state)["settings_ok_date"] == date.today().isoformat()
+
+    runner = Runner(game, Settings(), jumper, state)  # the bot started again
+    fake.t += 6_000
+    runner.tick()
+
+    assert len(checks) == 1
+    assert "Game settings check skipped" in event_names()
+
+
+def test_game_settings_are_checked_again_until_they_are_right(game, fake, jumper, monkeypatch, tmp_path) -> None:
+    state = tmp_path / "state.json"
+    update_state(state, settings_ok_date=date.today().isoformat())
+    checks = settings_checks(fake, monkeypatch, result=False)
+    runner = Runner(game, Settings(), jumper, state)
+    runner.settings_request.set()  # the window's "Check game settings now"
+    fake.t += 6_000
+    runner.tick()
+    assert len(checks) == 1 and load_state(state)["settings_ok_date"] is None  # something was wrong
+
+    runner = Runner(game, Settings(), jumper, state)  # the next Start checks again
+    fake.t += 6_000
+    runner.tick()
+    assert len(checks) == 2
+
+
+def test_check_game_settings_now_while_the_bot_runs(game, fake, jumper, monkeypatch) -> None:
+    checks = settings_checks(fake, monkeypatch, result=True)
+    runner = Runner(game, Settings(), jumper)
+    fake.t += 6_000
+    runner.tick()
+    runner.settings_request.set()
+    fake.t += 1_000
+    runner.tick()  # only at the slow check
+    assert len(checks) == 1
+
+    fake.t += 5_000
+    runner.tick()
+    assert len(checks) == 2 and not runner.settings_request.is_set()
