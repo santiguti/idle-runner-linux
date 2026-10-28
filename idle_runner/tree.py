@@ -4,7 +4,7 @@ Measured 2026-10-26: the tree keeps its last pan and zoom, but at
 its minimum zoom every node is always at the same place, so the routine zooms all the way out first.
 Clicking a node ("Buy on Click" off) opens a modal whose pixel at (468, 571) tells its state: green = Buy
 (the prerequisites are met, not necessarily the SP), red = one wide button, "Can't buy yet" (a
-prerequisite is missing) or "Close" (bought); the wider text tells them apart.
+prerequisite is missing) or "Close" (bought); the wider text tells them apart, in English and Spanish.
 
 The order is `Settings.tree_order` (by default the wiki's, see tree_nodes.py), which doesn't follow the
 tree's links: a node whose prerequisite comes later is skipped until a purchase may have unlocked it. A
@@ -33,6 +33,7 @@ from idle_runner.tree_nodes import NODES
 MODAL_STATE = (468, 571)
 BUY_GREEN = 0x00A400
 MODAL_RED = 0xAF0000
+LOCKED_TEXT_WIDTH = 120  # px: the red modal's button text is "Can't buy yet" when wider, "Close" when not
 JEWEL_BUTTON = 0x094309  # at MODAL_STATE in the jewel offer; its box at (583, 521) is white (2026-10-26)
 # A node's tooltip (measured 2026-10-25/26 on 34 tooltips, all read right): a 262626 box from x + 43,
 # centred on the pointer, up to ±122 px tall. Its cost line ends with the SP icon (6A31CA) and the digits
@@ -232,8 +233,11 @@ class Tree:
         if g.pixel_is(*MODAL_STATE, BUY_GREEN):
             return "buy"
         if g.pixel_is(*MODAL_STATE, MODAL_RED):
-            text = g.grab(564, 576, 608, 588)  # "Can't buy yet" is wider than "Close"
-            return "locked" if bool((text > 200).all(axis=2).any()) else "bought"
+            # The button's white text, measured 2026-10-28: "Close" 61 px wide, "Cerrar" 79; "Can't buy yet"
+            # about 170 (from the font's letters), "No se puede comprar todavía" 370.
+            columns = np.nonzero((g.grab(428, 576, 868, 588) > 200).all(axis=2).any(axis=0))[0]
+            width = int(columns[-1] - columns[0] + 1) if len(columns) else 0
+            return "locked" if width > LOCKED_TEXT_WIDTH else "bought"
         return None
 
     def open_modal(self, point: tuple[int, int]) -> str | None:

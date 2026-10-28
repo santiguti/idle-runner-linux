@@ -102,8 +102,8 @@ class FakeTree:
         self.fake.paint(538, 681, 0x150202)
         if name in self.bought or name in self.locked:
             self.fake.paint(468, 571, 0xAF0000)
-            if name in self.locked:
-                self.fake.paint(580, 582, 0xFFFFFF)
+            if name in self.locked:  # "Can't buy yet" is about 170 px wide, "Close" 61
+                self.fake.paint(561, 582, 0xFFFFFF, w=170)
         else:
             self.fake.paint(468, 571, 0x00A400)
 
@@ -131,7 +131,7 @@ class FakeTree:
         self.fade_until = self.fake.t + self.FADE_MS
         self.fake.paint(538, 681, 0x3C0606)
         self.fake.paint(468, 571, 0)
-        self.fake.paint(580, 582, 0)
+        self.fake.paint(561, 582, 0, w=170)
 
 
 def nodes_clicked(fake) -> list[str]:
@@ -357,3 +357,13 @@ def test_every_node_point_is_clear_of_the_header_and_the_tab_bar() -> None:
     for name, node in NODES.items():
         x, y = node.point
         assert 15 + 8 <= x <= 615 + 8 and 105 + 31 <= y <= 620 + 31, name
+
+
+@pytest.mark.parametrize(("frame", "state"), [("en-bought", "bought"), ("es-bought", "bought"),
+                                              ("es-locked", "locked")])
+def test_a_red_modal_is_told_by_its_button_text_in_english_and_spanish(game, fake, frame: str, state: str) -> None:
+    # The button's white text, 2026-10-28: "Close" 61 px wide and "Cerrar" 79; "Can't buy yet" about 170 (from
+    # the font) and "No se puede comprar todavía" 370. "Cerrar" reached into the old check's strip.
+    fake.frame[:] = read_png(FIXTURES / f"{frame}.png")
+
+    assert Tree(game, ()).modal() == state

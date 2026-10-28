@@ -3,8 +3,8 @@ in the original, which only listed them.
 
 The settings are a dialog behind the shop's "⋮" tab (measured 2026-10-28): a list that always opens at its top
 and scrolls 50 px per wheel notch. A toggle shows a red cross (F83308) on its left when off and a green tick
-(1DD700) on its right when on. Each row is told by its label's white pixels, which also tells that the game is
-in English. The bot only reads the list: it ends with "Delete Save" and "Delete Idle Slayer Account" and holds
+(1DD700) on its right when on. Each row is told by its label's white pixels, in English or Spanish (the game's
+other languages give "not found", never a wrong reading). The bot only reads the list: it ends with "Delete Save" and "Delete Idle Slayer Account" and holds
 "Remove Ads" purchases, so the only click inside the dialog is Cancel, and the wheel turns in the empty strip
 beside the scrollbar.
 """
@@ -15,15 +15,21 @@ from idle_runner.game import Game
 from idle_runner.log import event
 from idle_runner.shop import Shop
 
-# Each setting the bot needs: its label's right edge (client x) and white pixels, and the state it needs.
-SETTINGS: dict[str, tuple[tuple[int, int], bool]] = {
-    "Use scientific notation": ((680, 722), False),  # the coin, bonus and SP readers read plain numbers
-    "Disable custom cursor": ((680, 713), True),
-    "Rounded bulk buy": ((635, 700), True),
-    "Hide locked Quest rewards": ((731, 911), True),  # locked event rewards would sit in the Upgrades list
-    "Confirm dialogue when activating the Portal": ((846, 1360), False),
+# Each setting the bot needs, by its English name: its label's right edge (client x) and white pixels in English
+# and in Spanish (measured 2026-10-28; Spanish names in the comments), and the state it needs.
+SETTINGS: dict[str, tuple[tuple[tuple[int, int], ...], bool]] = {
+    # the coin, bonus and SP readers read plain numbers
+    "Use scientific notation": (((680, 722), (695, 750)), False),  # "Usar notación científica"
+    "Disable custom cursor": (((680, 713), (818, 1058)), True),  # "Desactivar el cursor personalizado"
+    "Rounded bulk buy": (((635, 700), (744, 912)), True),  # "Compra masiva redondeada"
+    # Locked event rewards would sit in the Upgrades list. "Ocultar recompensas de Misiones Bloqueadas": two
+    # lines, told by the first.
+    "Hide locked Quest rewards": (((731, 911), (801, 1127)), True),
+    "Confirm dialogue when activating the Portal": (((846, 1360), (848, 1204)), False),  # "Confirmar diálogo al
+                                                                                        # activar el portal"
 }
-SETTINGS_LABEL = (89, 558)  # the "Settings" button's label in the "⋮" menu: width and white pixels
+# The "Settings" button's label in the "⋮" menu, width and white pixels: "Settings", "Ajustes".
+SETTINGS_LABELS = ((89, 558), (83, 535))
 OFF, ON = (0xF8, 0x33, 0x08), (0x1D, 0xD7, 0x00)
 APPLY_GREEN, CANCEL_RED = 0x00A400, 0xAF0000
 SCROLLS = (33, 6)  # notches to the first four settings, then to the portal's (client y 149-484 and 169-432)
@@ -51,8 +57,8 @@ def read_toggles(game: Game) -> dict[str, bool]:
     for start, end in _bands(white):
         band = white[start:end]
         label = (int(np.nonzero(band.any(axis=0))[0].max()) + 445, int(band.sum()))
-        for name, (fingerprint, _) in SETTINGS.items():
-            if label == fingerprint:
+        for name, (fingerprints, _) in SETTINGS.items():
+            if label in fingerprints:
                 box = pixels[max(0, start - 8):end + 8, :75]  # the toggle, client x 365-439
                 found[name] = int((box == ON).all(axis=2).sum()) > int((box == OFF).all(axis=2).sum())
     return found
@@ -64,7 +70,7 @@ def find_settings_button(game: Game) -> tuple[int, int] | None:
     white = (game.grab(840, 161, 1024, 656) == 255).all(axis=2)  # client x 832-1016, y 130-625
     for start, end in _bands(white):
         columns = np.nonzero(white[start:end].any(axis=0))[0]
-        if (int(columns[-1] - columns[0] + 1), int(white[start:end].sum())) == SETTINGS_LABEL:
+        if (int(columns[-1] - columns[0] + 1), int(white[start:end].sum())) in SETTINGS_LABELS:
             return 840 + int(columns[0] + columns[-1]) // 2, 161 + start - 15
     return None
 

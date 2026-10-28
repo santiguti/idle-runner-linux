@@ -19,13 +19,14 @@ from tkinter import messagebox, ttk
 
 from idle_runner import DONATE_URL, REPO, __version__
 from idle_runner.blackbox import mark
-from idle_runner.config import Settings
+from idle_runner.config import Settings, load_settings
 from idle_runner.game import open_backend
 from idle_runner.log import setup_logging
 from idle_runner.process import self_command
 from idle_runner.state import state_path, update_state
 from idle_runner.stats import summarize
 from idle_runner.ui.activity import EventTail, Session, apply, describe
+from idle_runner.ui.i18n import set_language, t
 from idle_runner.ui.settings_page import SettingsPage
 from idle_runner.ui.theme import ASSETS, PALETTE, apply_theme, panel
 from idle_runner.ui.tree_page import TreePage
@@ -35,10 +36,12 @@ PAGES = ("Dashboard", "Settings", "Tree order", "Activity", "Help")
 KIND_COLOURS = {"buy": PALETTE.gold, "ascend": PALETTE.accent, "tree": PALETTE.accent, "minigame": PALETTE.text,
                 "box": PALETTE.text, "quest": PALETTE.gold, "problem": PALETTE.danger_text, "state": PALETTE.muted,
                 "raw": PALETTE.muted}
+STATS = ("Running for", "Upgrades", "Equipment", "Ascensions", "Last bonus", "Tree nodes", "Minigames", "Silver boxes",
+         "Problems")
 FILTERS = {"Everything": None, "Purchases": {"buy", "quest", "tree"}, "Ascensions": {"ascend"},
            "Minigames": {"minigame", "box"}, "Problems": {"problem"}}
 SETUP = """Before you start, in Idle Slayer:
-•  Windowed, 1280×720, in English.
+•  Windowed, 1280×720, in English or Spanish.
 •  Keys: jump = Up arrow, boost = Right arrow.
 •  Custom cursor off, portal dialogue off, scientific notation off.
 •  Rounded bulk on, hide locked quest rewards on.
@@ -53,7 +56,7 @@ SAFETY = """What the bot will never do:
 •  Spend jewels. It presses Buy in the tree only when the game shows enough Slayer Points.
 •  Ultra Ascend.
 Tree buying stays off until you turn it on. Ascending is on: at a +20% CpS bonus, at the latest every
-30 minutes (Settings, Ascending)."""
+30 minutes (Settings, Ascension)."""
 
 
 class BotProcess:
@@ -123,10 +126,11 @@ class GameProbe:
             width, height = self.backend.size()
         except Exception:
             self.backend = None
-            return "off", "Idle Slayer isn't running"
+            return "off", t("Idle Slayer isn't running")
         if (width, height) != (1280, 720):
-            return "warning", f"Idle Slayer's window is {width}×{height}: set it to 1280×720, windowed"
-        return "ok", "Idle Slayer found, 1280×720"
+            return "warning", t("Idle Slayer's window is {width}×{height}: set it to 1280×720, windowed",
+                                width=width, height=height)
+        return "ok", t("Idle Slayer found, 1280×720")
 
 
 def open_folder(path: Path) -> None:
@@ -157,7 +161,7 @@ class App:
         self.started_settings: Settings | None = None
         self.last_probe = 0.0
         self.last_output = ""
-        self.game_status = ("off", "Looking for Idle Slayer…")
+        self.game_status = ("off", t("Looking for Idle Slayer…"))
         self.added = 0  # lines ever added to the feed; the texts are redrawn only when it grows
         self.update_tag: str | None = None  # set by the update check's thread, shown by poll()
         self.drawn = -1
@@ -192,17 +196,18 @@ class App:
             ttk.Label(side, text="Idle Runner", style="Title.TLabel").pack(anchor="w", padx=16, pady=(0, 22))
         self.nav = {}
         for name in PAGES:
-            self.nav[name] = ttk.Button(side, text=name, style="Nav.TButton", command=lambda n=name: self.show(n))
+            self.nav[name] = ttk.Button(side, text=t(name), style="Nav.TButton", command=lambda n=name: self.show(n))
             self.nav[name].pack(fill="x")
         ttk.Frame(side).pack(fill="both", expand=True)
         self.support_button: ttk.Button | None = None
         if DONATE_URL:
-            self.support_button = ttk.Button(side, text="Support Idle Runner", style="Support.TButton",
+            self.support_button = ttk.Button(side, text=t("Support Idle Runner"), style="Support.TButton",
                                              command=lambda: webbrowser.open(DONATE_URL))
             self.support_button.pack(fill="x", padx=16, pady=(0, 14))
         self.update_label = ttk.Label(side, text="", style="Muted.TLabel", cursor="hand2", wraplength=200)
         self.update_label.pack(anchor="w", padx=18)
-        ttk.Label(side, text=f"Version {__version__}", style="Muted.TLabel").pack(anchor="w", padx=18)
+        ttk.Label(side, text=t("Version {version}", version=__version__), style="Muted.TLabel").pack(anchor="w",
+                                                                                                padx=18)
 
     def show(self, name: str) -> None:
         for page_name, page in self.pages.items():
@@ -216,7 +221,7 @@ class App:
         head.pack(fill="x")
         text = ttk.Frame(head)
         text.pack(side="left", fill="x", expand=True)
-        self.state_label = ttk.Label(text, text="Stopped", style="Title.TLabel")
+        self.state_label = ttk.Label(text, text=t("Stopped"), style="Title.TLabel")
         self.state_label.pack(anchor="w")
         self.state_detail = ttk.Label(text, text="", style="Muted.TLabel", wraplength=560, justify="left")
         self.state_detail.pack(anchor="w", pady=(2, 0))
@@ -224,30 +229,28 @@ class App:
         game.pack(anchor="w", pady=(10, 0))
         self.game_led = tk.Canvas(game, width=12, height=12, highlightthickness=0, bg=PALETTE.bg)
         self.game_led.pack(side="left", padx=(0, 8))
-        self.game_label = ttk.Label(game, text="Looking for Idle Slayer…")
+        self.game_label = ttk.Label(game, text=t("Looking for Idle Slayer…"))
         self.game_label.pack(side="left")
-        self.start_button = ttk.Button(head, text="Start", style="Start.TButton", command=self.start_or_stop)
+        self.start_button = ttk.Button(head, text=t("Start"), style="Start.TButton", command=self.start_or_stop)
         self.start_button.pack(side="right", anchor="n")
         self.restart_bar = ttk.Frame(page)
-        ttk.Label(self.restart_bar, text="Settings changed. Restart the bot to use them.",
+        ttk.Label(self.restart_bar, text=t("Settings changed. Restart the bot to use them."),
                   style="Warning.TLabel").pack(side="left")
-        ttk.Button(self.restart_bar, text="Restart", command=self.restart).pack(side="left", padx=10)
+        ttk.Button(self.restart_bar, text=t("Restart"), command=self.restart).pack(side="left", padx=10)
 
-        stats = panel(page, "This run")
+        stats = panel(page, t("This run"))
         stats.outer.pack(fill="x", pady=(18, 14))
         self.stat_values: dict[str, ttk.Label] = {}
-        names = ("Running for", "Upgrades", "Equipment", "Ascensions", "Last bonus", "Tree nodes", "Minigames",
-                 "Silver boxes", "Problems")
         grid = ttk.Frame(stats, style="Panel.TFrame")
         grid.pack(fill="x", pady=(8, 0))
-        for i, name in enumerate(names):
+        for i, name in enumerate(STATS):
             cell = ttk.Frame(grid, style="Panel.TFrame")
             cell.grid(row=i // 5, column=i % 5, sticky="w", padx=(0, 26), pady=(0, 10))
             self.stat_values[name] = ttk.Label(cell, text="–", style="Stat.Panel.TLabel")
             self.stat_values[name].pack(anchor="w")
-            ttk.Label(cell, text=name, style="Muted.Panel.TLabel").pack(anchor="w")
+            ttk.Label(cell, text=t(name), style="Muted.Panel.TLabel").pack(anchor="w")
 
-        recent = panel(page, "Latest")
+        recent = panel(page, t("Latest"))
         recent.outer.pack(fill="both", expand=True)
         self.recent = tk.Text(recent, height=8, wrap="word", bd=0, highlightthickness=0, padx=0, pady=6,
                               state="disabled", cursor="arrow")
@@ -255,24 +258,26 @@ class App:
 
         note = ttk.Frame(page)
         note.pack(fill="x", pady=(14, 0))
-        ttk.Label(note, text="Something went wrong?").pack(side="left")
+        ttk.Label(note, text=t("Something went wrong?")).pack(side="left")
         self.note = ttk.Entry(note)
         self.note.pack(side="left", fill="x", expand=True, padx=10)
         self.note.bind("<Return>", lambda e: self.mark_problem())
-        ttk.Button(note, text="Mark problem", command=self.mark_problem).pack(side="left")
+        ttk.Button(note, text=t("Mark problem"), command=self.mark_problem).pack(side="left")
 
     def build_activity(self, page: ttk.Frame) -> None:
         bar = ttk.Frame(page)
         bar.pack(fill="x", pady=(0, 10))
         self.filter = tk.StringVar(value="Everything")
         for name in FILTERS:
-            ttk.Radiobutton(bar, text=name, value=name, variable=self.filter, command=self.render_activity).pack(
+            ttk.Radiobutton(bar, text=t(name), value=name, variable=self.filter, command=self.render_activity).pack(
                 side="left", padx=(0, 12))
         self.raw = tk.BooleanVar(value=False)
-        ttk.Checkbutton(bar, text="Bot output", variable=self.raw, command=self.render_activity).pack(side="left")
-        ttk.Button(bar, text="Statistics", command=self.show_stats).pack(side="right")
-        ttk.Button(bar, text="Open logs folder", command=lambda: open_folder(self.log_dir)).pack(side="right",
-                                                                                              padx=8)
+        ttk.Checkbutton(bar, text=t("Bot output"), variable=self.raw, command=self.render_activity).pack(side="left")
+        tools = ttk.Frame(page)  # below the feed: the filters fill the top row, longer in Spanish
+        tools.pack(side="bottom", fill="x", pady=(10, 0))
+        ttk.Button(tools, text=t("Statistics"), command=self.show_stats).pack(side="right")
+        ttk.Button(tools, text=t("Open logs folder"), command=lambda: open_folder(self.log_dir)).pack(side="right",
+                                                                                                padx=8)
         body = panel(page)
         body.outer.pack(fill="both", expand=True)
         self.activity = tk.Text(body, wrap="word", bd=0, highlightthickness=0, state="disabled")
@@ -286,18 +291,18 @@ class App:
                 widget.tag_configure(kind, foreground=colour)
 
     def build_help(self, page: ttk.Frame) -> None:
-        for title, text in (("Set up the game", SETUP), ("Safety", SAFETY)):
+        for title, text in ((t("Set up the game"), t(SETUP)), (t("Safety"), t(SAFETY))):
             body = panel(page, title)
             body.outer.pack(fill="x", pady=(0, 14))
             ttk.Label(body, text=text, style="Panel.TLabel", justify="left", wraplength=720).pack(anchor="w",
                                                                                                pady=(6, 0))
-        links = panel(page, "Links")
+        links = panel(page, t("Links"))
         links.outer.pack(fill="x")
-        links_list = [("Project page on GitHub", f"https://github.com/{REPO}"),
-                      ("Report a problem", f"https://github.com/{REPO}/issues/new/choose"),
-                      ("All versions", f"https://github.com/{REPO}/releases")]
+        links_list = [(t("Project page on GitHub"), f"https://github.com/{REPO}"),
+                      (t("Report a problem"), f"https://github.com/{REPO}/issues/new/choose"),
+                      (t("All versions"), f"https://github.com/{REPO}/releases")]
         if DONATE_URL:
-            links_list.append(("Support Idle Runner", DONATE_URL))
+            links_list.append((t("Support Idle Runner"), DONATE_URL))
         for text, url in links_list:
             link = ttk.Label(links, text=text, style="Link.Panel.TLabel", cursor="hand2")
             link.pack(anchor="w", pady=(6, 0))
@@ -307,7 +312,7 @@ class App:
     def start_or_stop(self) -> None:
         if self.bot.running():
             self.bot.stop()
-            self.state_detail.configure(text="Stopping…")
+            self.state_detail.configure(text=t("Stopping…"))
             return
         if not self.settings_page.save():
             self.show("Settings")
@@ -324,10 +329,10 @@ class App:
     def check_game_settings(self) -> None:
         """The game's settings are checked once a day: check them again, now or at the next Start."""
         if self.bot.send("check-settings"):
-            text = "The bot checks the game's settings in a few seconds, while the game is in front."
+            text = t("The bot checks the game's settings in a few seconds, while the game is in front.")
         else:
             update_state(state_path(self.config_path), settings_ok_date=None)
-            text = "The bot checks the game's settings at the next Start."
+            text = t("The bot checks the game's settings at the next Start.")
         self.settings_page.show_message(text)
 
     def settings_saved(self, settings: Settings) -> None:
@@ -363,24 +368,25 @@ class App:
         running = self.bot.running()
         s = self.session
         if running and s.state == "paused":
-            title, detail = "Paused", f"{s.detail.capitalize()}. Click the game to resume."
+            title, detail = t("Paused"), t("{reason}. Click the game to resume.", reason=t(s.detail).capitalize())
         elif running and s.state == "game lost":
-            title, detail = "Waiting for the game", "Its window closed. The bot looks for it every 2 seconds."
+            title, detail = t("Waiting for the game"), t("Its window closed. The bot looks for it every 2 seconds.")
         elif running and s.doing:  # the window polls every 250 ms: a shorter routine may not show
-            title, detail = "Running", f"{s.doing}…"
+            title, detail = t("Running"), f"{t(s.doing)}…"
         elif running:
-            title, detail = "Running", "Playing while the game is in front. Click another window to pause it."
+            title, detail = t("Running"), t("Playing while the game is in front. Click another window to pause it.")
         elif self.bot.exit_code() not in (None, 0):
-            title, detail = "Stopped", self.last_output or f"The bot stopped (exit code {self.bot.exit_code()})."
+            title = t("Stopped")
+            detail = self.last_output or t("The bot stopped (exit code {code}).", code=self.bot.exit_code())
         else:
-            title, detail = "Stopped", "Press Start, then click the game."
+            title, detail = t("Stopped"), t("Press Start, then click the game.")
         self.state_label.configure(text=title)
         self.state_detail.configure(text=detail)
-        self.start_button.configure(text="Stop" if running else "Start",
+        self.start_button.configure(text=t("Stop") if running else t("Start"),
                                     style="Stop.TButton" if running else "Start.TButton")
         level, text = self.game_status
         if running:
-            level, text = ("ok", "Idle Slayer found, 1280×720") if s.state == "running" else (level, text)
+            level, text = ("ok", t("Idle Slayer found, 1280×720")) if s.state == "running" else (level, text)
         self.game_led.delete("all")
         self.game_led.create_rectangle(1, 1, 11, 11, width=0, fill={"ok": "#2FD158", "warning": PALETTE.warning}.get(
             level, PALETTE.danger))
@@ -418,8 +424,8 @@ class App:
             widget.insert("end", time.strftime("%H:%M  ", time.localtime(ts)), "time")
             widget.insert("end", text + "\n", kind)
         if not items:
-            widget.insert("end", "Nothing yet. Press Start on the Dashboard." if widget is self.activity
-                          else "Nothing yet.", "state")
+            widget.insert("end", t("Nothing yet. Press Start on the Dashboard.") if widget is self.activity
+                          else t("Nothing yet."), "state")
         widget.configure(state="disabled")
         if follow:
             widget.see("end")
@@ -430,11 +436,11 @@ class App:
 
     # --- other actions ---
     def mark_problem(self) -> None:
-        text = self.note.get().strip() or "(no description)"
+        text = self.note.get().strip() or t("(no description)")
         setup_logging(self.log_dir)
         folder = mark(self.log_dir, text)
         self.note.delete(0, "end")
-        self.add(time.time(), "state", f"Marked: {text} (saved in {folder})")
+        self.add(time.time(), "state", t("Marked: {text} (saved in {folder})", text=text, folder=folder))
         self.refresh()
 
     def show_stats(self) -> None:
@@ -450,12 +456,13 @@ class App:
             self.update_tag = tag
 
     def show_update(self, tag: str) -> None:
-        self.update_label.configure(text=f"Version {tag.lstrip('v')} is available", style="Link.TLabel")
+        self.update_label.configure(text=t("Version {version} is available", version=tag.lstrip("v")),
+                                    style="Link.TLabel")
         self.update_label.bind("<Button-1>", lambda e: webbrowser.open(f"https://github.com/{REPO}/releases"))
 
     def close(self) -> None:
         if self.bot.running():
-            if not messagebox.askyesno("Idle Runner", "Stop the bot and quit?"):
+            if not messagebox.askyesno("Idle Runner", t("Stop the bot and quit?")):
                 return
             self.bot.stop_and_wait()
         if self.settings_page.pending:
@@ -467,6 +474,10 @@ def main(config_path: Path) -> int:
     if sys.platform == "win32":
         from idle_runner.win32 import enable_dpi_awareness
         enable_dpi_awareness()  # before any window: crisp text at 125 % or 150 % scaling
+    try:  # the language first: every text is set as the window is built
+        set_language(load_settings(config_path).language if config_path.exists() else "auto")
+    except ValueError:  # the Settings page shows the problem
+        set_language("auto")
     root = tk.Tk()
     App(root, config_path)
     root.mainloop()

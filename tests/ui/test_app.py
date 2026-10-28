@@ -159,3 +159,26 @@ def test_check_game_settings_now_with_the_bot_stopped_forgets_today_s_check(wind
 
     assert load_state(tmp_path / "state.json") == {"settings_ok_date": None, "tree_bought": ["Village Key"]}
     assert "next Start" in app.settings_page.message.cget("text")
+
+
+def test_the_window_in_spanish(window, monkeypatch) -> None:
+    from idle_runner.ui.i18n import set_language
+    set_language("es")
+    try:
+        app = window()
+    finally:
+        set_language("en")
+
+    assert [app.nav[name].cget("text") for name in PAGES] == ["Panel", "Configuración", "Orden del árbol",
+                                                              "Actividad", "Ayuda"]
+    assert (app.state_label.cget("text"), app.start_button.cget("text")) == ("Detenido", "Iniciar")
+
+
+def test_the_language_setting_shows_names_and_saves_codes(window, tmp_path) -> None:
+    app = window()
+    assert app.settings_page.vars["language"].get() == "System language"
+
+    app.settings_page.vars["language"].set("Español")
+
+    assert app.settings_page.save()
+    assert 'language = "es"' in (tmp_path / "config.toml").read_text(encoding="utf-8")

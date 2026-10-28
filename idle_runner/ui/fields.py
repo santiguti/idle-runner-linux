@@ -1,7 +1,10 @@
 """How each setting appears on the Settings page: label, help, panel, widget and limits (Settings has the
-values and config.check_ranges the rules; tests keep these limits in line with it)."""
+values and config.check_ranges the rules; tests keep these limits in line with it). The texts are English; the
+page shows them through i18n.t."""
 import re
 from dataclasses import dataclass
+
+from idle_runner.ui.i18n import t
 
 
 @dataclass(frozen=True)
@@ -15,14 +18,19 @@ class Field:
     maximum: float | None = None
     step: float = 1
     choices: tuple[str, ...] = ()  # "choice": the labels; an int setting stores the label's position, from 1
+    values: tuple[str, ...] = ()  # "choice" on a str setting: what each label stores (default: the label itself)
     depends_on: str | None = None  # a toggle that has to be on for this field to matter
     warning: str = ""
 
 
-CARDS = ("Playing", "Shopping", "Ascending", "Ascension Tree", "Minions", "Minigames", "Crafting", "Advanced")
+CARDS = ("Window", "Playing", "Shopping", "Ascension", "Ascension Tree", "Minions", "Minigames", "Crafting",
+         "Advanced")
 ZONES = ("Hills", "Hot Desert", "Jungle", "Frozen Fields", "Funky", "Modern City", "Factory", "Valley", "Castle")
 
 FIELDS: dict[str, Field] = {
+    # Window
+    "language": Field("Language", "The window's language. It changes the next time you open Idle Runner.", "Window",
+                      "choice", choices=("System language", "English", "Español"), values=("auto", "en", "es")),
     # Playing
     "jump_interval_ms": Field("Time between jumps", "How often the bot jumps and boosts.", "Playing", "slider",
                               "ms", 0, 300, 10),
@@ -43,18 +51,18 @@ FIELDS: dict[str, Field] = {
     "post_ascend_first_buy_seconds": Field(
         "First buy after ascending", "Then the wait doubles until it reaches the interval above. 0 waits the "
         "full interval.", "Shopping", "int", "seconds", 0, 600, 5, depends_on="auto_buy_upgrades"),
-    # Ascending
-    "auto_ascend": Field("Ascend automatically", "", "Ascending", "toggle",
+    # Ascension
+    "auto_ascend": Field("Ascend automatically", "", "Ascension", "toggle",
                          warning="Ascending resets your run. It can't be undone. The bot never Ultra Ascends."),
     "auto_ascend_percent": Field(
         "Ascend at this bonus", "As soon as the Ascend button shows at least this \"+X% CpS bonus\". The wiki "
-        "suggests about 20 % mid game and 10 % late. 0 ascends on the timer only.", "Ascending", "float", "%",
+        "suggests about 20 % mid game and 10 % late. 0 ascends on the timer only.", "Ascension", "float", "%",
         0, 100, 0.5, depends_on="auto_ascend"),
-    "auto_ascend_minutes": Field("Or at the latest every", "", "Ascending", "float", "minutes", 1, 600, 1,
+    "auto_ascend_minutes": Field("Or at the latest every", "", "Ascension", "float", "minutes", 1, 600, 1,
                                  depends_on="auto_ascend"),
     "ascend_bonus_sample_minutes": Field(
         "Check the bonus every", "Reads the Ascend button and logs the bonus. 0 never checks it, so ascending "
-        "at a bonus is off too.", "Ascending", "float", "minutes", 0, 60, 1),
+        "at a bonus is off too.", "Ascension", "float", "minutes", 0, 60, 1),
     # Ascension Tree
     "auto_buy_tree": Field("Buy Ascension Tree nodes",
                            "At start and after every ascension, in the order of the Tree order page.",
@@ -70,12 +78,13 @@ FIELDS: dict[str, Field] = {
     "skip_bonus_stage": Field("Skip bonus stages", "Waits for them to end instead of playing.", "Minigames",
                               "toggle"),
     "no_lockpicking": Field("I don't have Lockpicking 100",
-                            "The Divinity that lets chest hunts open more chests.", "Minigames", "toggle"),
+                            "The Divinity that makes Chest Hunt animations twice as fast: without it the bot waits "
+                            "longer at each chest.", "Minigames", "toggle"),
     "no_reinforced_crystal_saver": Field(
         "I don't have the Reinforced Crystal Saver", "Then the life saver opens right after the first chest, "
         "even with Perfect Chest Hunts on.", "Minigames", "toggle"),
     "perfect_chest_hunt": Field(
-        "Go for Perfect Chest Hunts", "Riskier: ignores the life saver until a 2x shows. Turn the 2x2x Dark "
+        "Go for Perfect Chest Hunts", "Riskier: ignores the life saver until a 2x shows. Turn the x2 x2 Dark "
         "Divinity off.", "Minigames", "toggle"),
     # Crafting
     "craft_soul_bonus": Field("Craft a Souls Compass", "At a Megahorde with Soul Bonus.", "Crafting", "toggle"),
@@ -101,6 +110,8 @@ FIELDS: dict[str, Field] = {
 
 
 def friendly(problem: str) -> str:
-    """A config.check_ranges message with labels instead of setting names, and without the file name."""
+    """A config.check_ranges message in the window's language, with labels instead of setting names and without
+    the file name."""
     problem = problem.split(": ", 1)[-1]  # every message starts with the config file's path
-    return re.sub(r"\b(" + "|".join(FIELDS) + r")\b", lambda m: f"“{FIELDS[m[1]].label}”", problem)
+    problem = "; ".join(t(part) for part in problem.split("; "))
+    return re.sub(r"\b(" + "|".join(FIELDS) + r")\b", lambda m: f"“{t(FIELDS[m[1]].label)}”", problem)

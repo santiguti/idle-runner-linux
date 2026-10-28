@@ -71,7 +71,7 @@ def play_minions_tab(fake, monkeypatch, available: int | None, takes_effect: boo
             show_panel(fake, "send-526")
         for top, cost in costs.items():
             if in_button(click, top) and takes_effect:
-                fake.paint(438, top, 0x975DCA, w=1, h=123)
+                fake.paint(410, top, 0x975DCA, w=29, h=123)
                 sent.append(cost)
 
     fake.on_action = act
@@ -129,7 +129,7 @@ def test_nothing_is_clicked_without_the_minions_tab(game, fake, event_names) -> 
     fake.on_action = act
     send_minions(game)
 
-    assert fake.clicks() == [(95, 90), (93, 680), (332, 680), (570, 694)]
+    assert fake.clicks() == [(95, 90), (93, 680), (332, 680), (332, 680), (570, 694)]  # retried once
     assert "Minions tab not shown" in event_names()
 
 
@@ -141,8 +141,8 @@ def test_a_tab_without_known_buttons_is_kept_for_a_look(game, fake, monkeypatch,
     def other_buttons(action: tuple) -> None:
         send_panel(action)
         if action == ("click", 332 - 8, 680 - 31):
-            fake.paint(438, WHITE_KNIGHT, 0x7A7A7A, w=1, h=123)
-            fake.paint(438, DARK_WIZARD, 0x7A7A7A, w=1, h=123)
+            fake.paint(410, WHITE_KNIGHT, 0x7A7A7A, w=29, h=123)
+            fake.paint(410, DARK_WIZARD, 0x7A7A7A, w=29, h=123)
 
     fake.on_action = other_buttons
     send_minions(game)
@@ -161,11 +161,11 @@ def finished_white_knight(fake, monkeypatch, claim_takes_effect: bool = True) ->
         click = (action[1] + OFFSET[0], action[2] + OFFSET[1]) if action[0] == "click" else None
         if click and in_button(click, WHITE_KNIGHT) and fake.frame[WHITE_KNIGHT - 31, 430][1] == 0xA6:
             if claim_takes_effect:
-                fake.paint(438, WHITE_KNIGHT, 0x541787, w=1, h=123)
+                fake.paint(410, WHITE_KNIGHT, 0x541787, w=29, h=123)
             return
         send_panel(action)
         if action == ("click", 332 - 8, 680 - 31):
-            fake.paint(438, WHITE_KNIGHT, 0x11A622, w=1, h=123)
+            fake.paint(410, WHITE_KNIGHT, 0x11A622, w=29, h=123)
 
     fake.on_action = act
     return sent
@@ -241,3 +241,51 @@ def test_waits_for_the_minions_tab_to_fade_in(game, fake, monkeypatch) -> None:
     send_minions(game)
 
     assert sent == [10, 150]
+
+
+def test_finds_the_buttons_with_the_game_in_spanish(game, fake) -> None:
+    # "Realizando una Misión ..." (2026-10-28) is wider than "On a Mission...": the column the buttons were
+    # found on crossed its letters. Three whole buttons; the fourth is cut off by the tab bar.
+    show_panel(fake, "es-away-96954")
+
+    assert send_buttons(game, minions.AWAY) == [151, 301, 451]
+    assert read_available_sp(game) == 96_954
+
+
+def test_reads_the_cost_with_the_game_in_spanish(game, fake) -> None:
+    # "Dar Misión (-1,000 SP)": the cost is the second of two lines (the third in English), and the list's
+    # scrollbar sits right of the button (2026-10-28, after an ascension: Skeleton and Goo Mutant to send).
+    show_panel(fake, "es-send-149022")
+
+    assert send_buttons(game) == [151, 451]
+    assert [read_mission_cost(game, top) for top in send_buttons(game)] == [1_000, 1_500]
+    assert read_available_sp(game) == 149_022
+
+
+def test_a_lost_minions_tab_click_is_retried(game, fake, monkeypatch, event_names) -> None:
+    # Live 2026-10-28 19:25: the panel was already on the Minions tab; the Ascension tab click switched the list
+    # away at once but its shade stayed on Minions, and the Minions click 24 ms later was lost. The shade said
+    # "Minions" over the Ascension tab: nothing was sent.
+    sent = play_minions_tab(fake, monkeypatch, available=526)
+    show_panel(fake, "send-526")  # open on the Minions tab, its shade included
+    fake.paint(538, 681, 0xAD1111)
+    act, last_tab_click = fake.on_action, [-1.0]
+
+    def tab_switch_swallows_clicks(action: tuple) -> None:
+        if action[0] != "click":
+            return act(action)
+        click = (action[1] + OFFSET[0], action[2] + OFFSET[1])
+        if click == (93, 680):  # the Ascension tab: its list, the Minions shade stays a while
+            fake.paint(410, 136, 0x3A3A3A, w=200, h=520)
+            fake.paint(260, 480, 0x58188D)
+            last_tab_click[0] = fake.t
+        elif click == (332, 680) and fake.t - last_tab_click[0] < 100:
+            return  # lost
+        else:
+            act(action)
+
+    fake.on_action = tab_switch_swallows_clicks
+    send_minions(game)
+
+    assert sent == [10, 150]
+    assert "Shop click retried" in event_names()

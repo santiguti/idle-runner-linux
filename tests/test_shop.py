@@ -15,15 +15,15 @@ def client_click(x: int, y: int) -> tuple:
 
 def show_tab(fake, tab: str) -> None:
     """Paint the shop's six-tab bar as measured on 2026-10-22/25: the X tab's red (1200-1268), the selected
-    tab darker, and only the Upgrades tab has the grey "Buy all available" bar at (1180, 636). "quests"
-    paints no buying tab: the blank fake has no selected tab elsewhere."""
+    tab darker, and only the Upgrades tab has the grey "Buy all available" bar (its right end at
+    (1240, 636)). "quests" paints no buying tab: the blank fake has no selected tab elsewhere."""
     fake.paint(1210, 700, 0xA61010)
     if tab == "upgrades":
         fake.paint(915, 700, 0x5A251A)
-        fake.paint(1180, 636, 0xA8A8A8)
+        fake.paint(1240, 636, 0xA8A8A8)
     elif tab == "armor":
         fake.paint(820, 700, 0x5E261B)
-        fake.paint(1180, 636, 0x898989)
+        fake.paint(1240, 636, 0x898989)
 
 
 def paint_tab_bar(fake, name: str) -> None:
@@ -36,7 +36,9 @@ def paint_tab_bar(fake, name: str) -> None:
 
 @pytest.mark.parametrize("name, shown", [
     ("6-armor", "armor"), ("6-upgrades", "upgrades"), ("6-quests", "quests"), ("6-quests-gold", "quests"),
-    ("5-upgrades", "upgrades"), ("5-jewels", None)])
+    ("5-upgrades", "upgrades"), ("5-jewels", None),
+    # The game in Spanish (2026-10-28): "Compra todo lo disponible" is wider and covered (1180, 636) with text.
+    ("es-armor", "armor"), ("es-upgrades", "upgrades"), ("es-quests", "quests")])
 def test_tab_shown_on_recorded_tab_bars(game, fake, name: str, shown: str | None) -> None:
     paint_tab_bar(fake, name)
     shop = Shop(game)

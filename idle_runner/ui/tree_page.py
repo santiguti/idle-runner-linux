@@ -4,6 +4,10 @@ from collections.abc import Callable, Collection, Sequence
 from tkinter import ttk
 
 from idle_runner.tree_nodes import NODES, RECOMMENDED_ORDER
+from idle_runner.ui.i18n import node_name, t
+
+ORDER_COLUMNS = ("#", "Node", "Cost (SP)", "Status")
+REST_COLUMNS = ("Node", "Cost (SP)")
 
 
 def move(order: tuple[str, ...], name: str, to: int) -> tuple[str, ...]:
@@ -37,32 +41,32 @@ class TreePage(ttk.Frame):
         self._dragged = ""
 
         bar = ttk.Frame(self)
-        ttk.Label(bar, text="Search").pack(side="left")
+        ttk.Label(bar, text=t("Search")).pack(side="left")
         ttk.Entry(bar, textvariable=self.search).pack(side="left", fill="x", expand=True, padx=8)
-        ttk.Button(bar, text="Reset to recommended", command=self.reset).pack(side="right")
+        ttk.Button(bar, text=t("Reset to recommended"), command=self.reset).pack(side="right")
         bar.pack(fill="x", pady=(0, 8))
 
-        ttk.Label(self, text="Bought by the bot, in this order").pack(anchor="w")
-        self.order_view = self._table(("#", "Node", "Cost (SP)", "Status"), 10)
+        ttk.Label(self, text=t("Bought by the bot, in this order")).pack(anchor="w")
+        self.order_view = self._table(ORDER_COLUMNS, 10)
         self.order_view.bind("<ButtonPress-1>", lambda e: setattr(self, "_dragged", self.order_view.identify_row(e.y)))
         self.order_view.bind("<ButtonRelease-1>", self._release)
         buttons = ttk.Frame(self)
         ttk.Button(buttons, text="↑", width=3, command=lambda: self.nudge(-1)).pack(side="left")
         ttk.Button(buttons, text="↓", width=3, command=lambda: self.nudge(+1)).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Remove", command=self.remove).pack(side="left")
+        ttk.Button(buttons, text=t("Remove"), command=self.remove).pack(side="left")
         buttons.pack(anchor="w", pady=8)
 
-        ttk.Label(self, text="Not bought by the bot").pack(anchor="w")
-        self.rest_view = self._table(("Node", "Cost (SP)"), 5)
+        ttk.Label(self, text=t("Not bought by the bot")).pack(anchor="w")
+        self.rest_view = self._table(REST_COLUMNS, 5)
         self.rest_view.bind("<Double-1>", lambda e: self.add())
-        ttk.Button(self, text="Add", command=self.add).pack(anchor="w", pady=8)
+        ttk.Button(self, text=t("Add"), command=self.add).pack(anchor="w", pady=8)
         self.refresh()
 
     def _table(self, columns: tuple[str, ...], height: int) -> ttk.Treeview:
         frame = ttk.Frame(self)
         view = ttk.Treeview(frame, columns=columns, show="headings", height=height, selectmode="browse")
         for column in columns:
-            view.heading(column, text=column)
+            view.heading(column, text=t(column))
             view.column(column, width=60 if column == "#" else 150, anchor="e" if column in ("#", "Cost (SP)") else "w")
         scroll = ttk.Scrollbar(frame, command=view.yview)
         view.configure(yscrollcommand=scroll.set)
@@ -78,16 +82,22 @@ class TreePage(ttk.Frame):
         self.order_view.delete(*self.order_view.get_children())
         self.rest_view.delete(*self.rest_view.get_children())
         for place, name in enumerate(self.order, 1):
-            if wanted in name.lower():
-                status = "bought this run" if name in self.bought else ""
-                self.order_view.insert("", "end", iid=name, values=(place, name, f"{NODES[name].cost:,}", status))
+            if self.matches(name, wanted):
+                status = t("bought this run") if name in self.bought else ""
+                values = (place, node_name(name), f"{NODES[name].cost:,}", status)
+                self.order_view.insert("", "end", iid=name, values=values)
         for name, node in NODES.items():
-            if name not in self.order and wanted in name.lower():
-                self.rest_view.insert("", "end", iid=name, values=(name, f"{node.cost:,}"))
+            if name not in self.order and self.matches(name, wanted):
+                self.rest_view.insert("", "end", iid=name, values=(node_name(name), f"{node.cost:,}"))
         for name in selected:
             for view in (self.order_view, self.rest_view):
                 if view.exists(name):
                     view.selection_set(name)
+
+    @staticmethod
+    def matches(name: str, wanted: str) -> bool:
+        """The search box finds a node by its English name or by the name shown."""
+        return wanted in name.lower() or wanted in node_name(name).lower()
 
     def set_order(self, order: Sequence[str]) -> None:
         """Show a new order (e.g. a reloaded config) without reporting it as a change."""

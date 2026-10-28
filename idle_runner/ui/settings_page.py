@@ -8,6 +8,7 @@ from tkinter import messagebox, ttk
 
 from idle_runner.config import Settings, check_ranges, dump_settings, load_settings
 from idle_runner.ui.fields import CARDS, FIELDS, Field, friendly
+from idle_runner.ui.i18n import t
 from idle_runner.ui.theme import Toggle, panel
 
 TYPES = {f.name: f.type for f in fields(Settings)}
@@ -60,8 +61,8 @@ class SettingsPage(ttk.Frame):
             if config_path.exists():
                 self.settings = load_settings(config_path)
         except ValueError as exc:  # also covers a TOML syntax error
-            self.load_error = (f"{friendly(str(exc))}. These are the defaults; changing a setting saves them "
-                               f"over {config_path.name}.")
+            self.load_error = t("{problem}. These are the defaults; changing a setting saves them over {file}.",
+                                problem=friendly(str(exc)), file=config_path.name)
         self.saved_mtime = mtime(config_path)
         self.tree_order = self.settings.tree_order
         self.vars: dict[str, tk.Variable] = {}
@@ -72,14 +73,14 @@ class SettingsPage(ttk.Frame):
         self.message.pack(anchor="w", fill="x")
         game = ttk.Frame(self)
         game.pack(fill="x", pady=(0, 12), padx=(2, 14))
-        ttk.Label(game, text="The bot checks Idle Slayer's own settings at the first Start of each day.",
+        ttk.Label(game, text=t("The bot checks Idle Slayer's own settings at the first Start of each day."),
                   style="Muted.TLabel").pack(side="left")
-        self.check_button = ttk.Button(game, text="Check game settings now", command=on_check_game)
+        self.check_button = ttk.Button(game, text=t("Check game settings now"), command=on_check_game)
         self.check_button.pack(side="right")
         scroll = ScrollFrame(self)
         scroll.pack(fill="both", expand=True)
         for card in CARDS:
-            body = panel(scroll.inner, card)
+            body = panel(scroll.inner, t(card))
             body.outer.pack(fill="x", pady=(0, 14), padx=(2, 14))
             body.columnconfigure(1, weight=1)
             for key, field in FIELDS.items():
@@ -97,19 +98,19 @@ class SettingsPage(ttk.Frame):
             var: tk.Variable = tk.BooleanVar(value=value)
             widget: tk.Widget = Toggle(row, var, command=self.changed)
             widget.grid(row=0, column=0, rowspan=3, sticky="nw", padx=(0, 12))
-            ttk.Label(row, text=field.label, style="Strong.Panel.TLabel").grid(row=0, column=1, sticky="w")
+            ttk.Label(row, text=t(field.label), style="Strong.Panel.TLabel").grid(row=0, column=1, sticky="w")
         else:
-            ttk.Label(row, text=field.label, style="Strong.Panel.TLabel").grid(row=0, column=0, sticky="w")
+            ttk.Label(row, text=t(field.label), style="Strong.Panel.TLabel").grid(row=0, column=0, sticky="w")
             row.columnconfigure(0, minsize=250)
             var = tk.StringVar(value=self.shown(field, value))
             widget = self.value_widget(row, field, var)
             widget.grid(row=0, column=1, sticky="w")
             var.trace_add("write", lambda *_: self.changed())
         if field.help:
-            ttk.Label(row, text=field.help, style="Muted.Panel.TLabel", wraplength=560, justify="left").grid(
+            ttk.Label(row, text=t(field.help), style="Muted.Panel.TLabel", wraplength=560, justify="left").grid(
                 row=1, column=1 if field.kind == "toggle" else 0, columnspan=3, sticky="w")
         if field.warning:
-            ttk.Label(row, text=field.warning, style="Warning.Panel.TLabel", wraplength=560, justify="left").grid(
+            ttk.Label(row, text=t(field.warning), style="Warning.Panel.TLabel", wraplength=560, justify="left").grid(
                 row=2, column=1 if field.kind == "toggle" else 0, columnspan=3, sticky="w")
         self.vars[key] = var
         self.inputs[key] = [widget]
@@ -123,7 +124,8 @@ class SettingsPage(ttk.Frame):
             scale.pack(side="left")
             ttk.Label(box, textvariable=var, style="Panel.TLabel", width=4, anchor="e").pack(side="left", padx=(8, 0))
         elif field.kind == "choice":
-            ttk.Combobox(box, textvariable=var, values=field.choices, state="readonly", width=16).pack(side="left")
+            ttk.Combobox(box, textvariable=var, values=self.choices(field), state="readonly", width=16).pack(
+                side="left")
         elif field.kind == "text":
             ttk.Entry(box, textvariable=var, width=24).pack(side="left")
         else:
@@ -131,13 +133,19 @@ class SettingsPage(ttk.Frame):
                         from_=field.minimum if field.minimum is not None else -10_000,
                         to=field.maximum if field.maximum is not None else 10_000).pack(side="left")
         if field.unit:
-            ttk.Label(box, text=field.unit, style="Muted.Panel.TLabel").pack(side="left", padx=(6, 0))
+            ttk.Label(box, text=t(field.unit), style="Muted.Panel.TLabel").pack(side="left", padx=(6, 0))
         return box
 
     @staticmethod
-    def shown(field: Field, value: object) -> str:
+    def choices(field: Field) -> list[str]:
+        """A "choice" field's labels as the page shows them."""
+        return [t(choice) for choice in field.choices]
+
+    def shown(self, field: Field, value: object) -> str:
         if field.kind == "choice" and isinstance(value, int):
-            return field.choices[value - 1]
+            return self.choices(field)[value - 1]
+        if field.kind == "choice" and field.values:
+            return self.choices(field)[field.values.index(str(value))]
         if isinstance(value, float) and value.is_integer():
             return str(int(value))
         return str(value)
@@ -150,12 +158,14 @@ class SettingsPage(ttk.Frame):
             if kind is bool or kind is str and field.kind != "choice":
                 values[key] = raw.strip() if isinstance(raw, str) else raw
             elif field.kind == "choice":
-                values[key] = field.choices.index(raw) + 1 if kind is int else raw
+                index = self.choices(field).index(raw)
+                values[key] = index + 1 if kind is int else (field.values or field.choices)[index]
             else:
                 try:
                     number = float(str(raw).replace(",", "."))
                 except ValueError:
-                    raise ValueError(f"x: “{field.label}” must be a number, not {raw!r}") from None
+                    raise ValueError("x: " + t("“{label}” must be a number, not {value}", label=t(field.label),
+                                               value=repr(raw))) from None
                 values[key] = int(number) if kind is int else number
         return Settings(**values, tree_order=self.tree_order)
 
@@ -181,9 +191,9 @@ class SettingsPage(ttk.Frame):
         if settings == self.settings and self.config_path.exists() and not self.load_error:
             self.show_message("")
             return True
-        if mtime(self.config_path) != self.saved_mtime and not messagebox.askyesno(
-                "Idle Runner", f"{self.config_path.name} changed outside this window. Replace those changes with "
-                               "the settings shown here?\n\n(No: close the window and open it again to see them.)"):
+        if mtime(self.config_path) != self.saved_mtime and not messagebox.askyesno("Idle Runner", t(
+                "{file} changed outside this window. Replace those changes with the settings shown here?\n\n"
+                "(No: close the window and open it again to see them.)", file=self.config_path.name)):
             return False
         self.config_path.write_text(dump_settings(settings), encoding="utf-8")
         self.saved_mtime, self.settings, self.load_error = mtime(self.config_path), settings, ""

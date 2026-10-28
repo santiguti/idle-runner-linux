@@ -70,7 +70,7 @@ python3 -m venv .venv
 ```
 
 **2. Set up the game:**
-- Windowed, **1280x720**, in **English**.
+- Windowed, **1280x720**, in **English** or **Spanish**.
 - Keybinds: jump = **Up arrow**, boost = **Right arrow**.
 - Disable the custom cursor, the portal dialogue and scientific notation.
 - Enable *rounded bulk* and *hide locked quest rewards*.
@@ -87,6 +87,8 @@ Press **Start**, then click on the game. The bot only plays while the game windo
 - **Tree order:** which Ascension Tree nodes the bot buys, and in what order. Drag them, add or remove them, or go back to the recommended order.
 - **Activity:** everything the bot did, filtered by purchases, ascensions, minigames or problems.
 - **Help:** the game setup above, what the bot never does, and links.
+
+The window is in English or Spanish, following your system's language; change it in *Settings → Window → Language*.
 
 <details>
 <summary>Windows</summary>

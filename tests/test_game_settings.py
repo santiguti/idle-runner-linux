@@ -8,6 +8,8 @@ FIXTURES = Path(__file__).parent / "fixtures" / "game_settings"
 # Recorded live on 2026-10-28 (Santi's settings): the shop's "⋮" menu, and the Settings dialog at its top and
 # 33 and 39 wheel notches down.
 MENU, TOP, AT33, AT39 = (read_png(FIXTURES / f"{name}.png") for name in ("menu", "top", "at33", "at39"))
+# The same with the game in Spanish (2026-10-28): "Ajustes", "Usar notación científica", ...
+ES_MENU, ES_TOP, ES_AT33, ES_AT39 = (read_png(FIXTURES / f"es-{name}.png") for name in ("menu", "top", "at33", "at39"))
 
 
 def test_reads_the_toggles_on_screen(game, fake) -> None:
@@ -15,6 +17,15 @@ def test_reads_the_toggles_on_screen(game, fake) -> None:
     assert read_toggles(game) == {"Use scientific notation": False, "Disable custom cursor": True,
                                   "Rounded bulk buy": True, "Hide locked Quest rewards": True}
     fake.frame[:] = AT39
+    assert read_toggles(game) == {"Hide locked Quest rewards": True,
+                                  "Confirm dialogue when activating the Portal": False}
+
+
+def test_reads_the_toggles_with_the_game_in_spanish(game, fake) -> None:
+    fake.frame[:] = ES_AT33
+    assert read_toggles(game) == {"Use scientific notation": False, "Disable custom cursor": True,
+                                  "Rounded bulk buy": True, "Hide locked Quest rewards": True}
+    fake.frame[:] = ES_AT39
     assert read_toggles(game) == {"Hide locked Quest rewards": True,
                                   "Confirm dialogue when activating the Portal": False}
 
@@ -29,9 +40,11 @@ def test_finds_the_settings_button_by_its_label(game, fake) -> None:
     assert find_settings_button(game) == (930, 558)  # client (922, 527), on the button above its label
     fake.frame[:] = TOP
     assert find_settings_button(game) is None
+    fake.frame[:] = ES_MENU  # "Ajustes"
+    assert find_settings_button(game) == (930, 558)
 
 
-def play_settings(fake, at33=AT33, at39=AT39) -> None:
+def play_settings(fake, at33=AT33, at39=AT39, menu=MENU, top=TOP) -> None:
     """The shop opens (its corner and tab bar), "⋮" shows the menu, Settings opens the dialog at its top,
     each wheel notch moves it 50 px (only the two recorded positions are painted) and Cancel goes back."""
     notches = [0]
@@ -39,18 +52,18 @@ def play_settings(fake, at33=AT33, at39=AT39) -> None:
     def act(action: tuple) -> None:
         if action[0] == "button" and action[1:] == (5, True):
             notches[0] += 1
-            fake.frame[:] = at33 if notches[0] == 33 else at39 if notches[0] == 39 else TOP
+            fake.frame[:] = at33 if notches[0] == 33 else at39 if notches[0] == 39 else top
         if action[0] != "click":
             return
         click = (action[1] + OFFSET[0], action[2] + OFFSET[1])
         if click == (1163, 655):  # the shop button
-            fake.frame[:] = MENU  # the corner and the tab bar are what open_shop looks at
+            fake.frame[:] = menu  # the corner and the tab bar are what open_shop looks at
         elif click == (1158, 696):  # the "⋮" tab
-            fake.frame[:] = MENU
+            fake.frame[:] = menu
         elif click == (930, 558):  # Settings
-            fake.frame[:] = TOP
+            fake.frame[:] = top
         elif click == (791, 631):  # Cancel
-            fake.frame[:] = MENU
+            fake.frame[:] = menu
         elif click == (1244, 712):  # the shop's X
             fake.frame.fill(0)
 
@@ -66,6 +79,13 @@ def test_checks_the_settings_and_only_cancels(game, fake, events) -> None:
     assert names.count("Game settings checked") == 1
     assert (503, 631) not in fake.clicks()  # never Apply
     assert fake.clicks()[-2:] == [(791, 631), (1244, 712)]  # Cancel, then the shop's X
+
+
+def test_checks_the_settings_with_the_game_in_spanish(game, fake, events) -> None:
+    play_settings(fake, ES_AT33, ES_AT39, ES_MENU, ES_TOP)
+
+    assert check_game_settings(game, Shop(game))
+    assert (428, 631) not in fake.clicks()  # never Aplicar
 
 
 def test_reports_a_wrong_setting(game, fake, events) -> None:

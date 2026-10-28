@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.2.0 (2026-10-28)
+
+**Idle Runner and the bot now speak Spanish**: the window in English or Spanish, and the game played in either language.
+
+### New
+- **Idle Runner in Spanish.** The window follows your system's language, English or Spanish; *Settings → Window → Language* changes it (it takes effect when you open Idle Runner again). In Spanish it uses the game's own words: its settings, the 161 Ascension Tree nodes (on the Tree order page and in the activity list) and names like "Súbditos", "Mega Horda" or "Etapa Bonus". Idle Runner's Settings page is "Configuración", so it isn't confused with the game's "Ajustes". The Spanish page and README now show the window in Spanish.
+- **Plays with the game in Spanish.** The bot now reads the game in English or in Spanish: the game's settings ("Ajustes"), the Ascension Tree's "Cerrar" and "No se puede comprar todavía", the minions' "Realizando una Misión ..." and "Dar Misión (-1,000)" (the cost is on the button's second line in Spanish) and the Upgrades tab's "Compra todo lo disponible". Before, with the game in Spanish it didn't buy upgrades, didn't see the minions, couldn't check the settings and walked the whole tree on every run.
+
+### Fixed
+- **A lost click on the Minions tab sent no minion.** With the panel already on the Minions tab, the click right after the Ascension tab's was lost, and the tab's shade still said "Minions": the bot read the Ascension tab as the minions list. It now waits for the minions' buttons and clicks the tab again once if they don't show.
+- **Wrong help for "I don't have Lockpicking 100".** The divinity makes Chest Hunt animations twice as fast (the bot waits longer at each chest without it); the help said it opened more chests. The Perfect Chest Hunts help also names the Dark Divinity right: "x2 x2".
+
+### Changed
+- The Settings page starts with a new **Window** panel (the language), and the "Ascending" panel is now called **Ascension**.
+- The dashboard says "Buying upgrades and equipment…" while the bot shops (it said "Shopping…").
+- The Activity page's "Statistics" and "Open logs folder" buttons moved under the list: at the window's smallest size they didn't fit beside the filters.
+- `config.toml` has a new `language` setting in `[general]`: `"auto"` (the system's), `"en"` or `"es"`. Older configs load as before.
+- The website and the README say the game can be in English or Spanish; the Spanish ones use the game's own Spanish words and show the window in Spanish.
+
 ## v2.1.2 (2026-10-28)
 
 ### Fixed

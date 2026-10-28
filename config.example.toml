@@ -25,6 +25,7 @@ ascend_bonus_sample_minutes = 2.5        # read the Ascend button's "+X% CpS bon
                                          # (0 = off)
 auto_buy_tree = false                    # buy Ascension Tree nodes (spends SP) in the order of tree_order:
                                          # at start and after each ascension
+language = "auto"                        # the window's language: "auto" (the system's), "en" or "es"
 
 [tree]
 # Nodes the bot buys, in this order. Omitted = the recommended order (the wiki's, 110 nodes: see

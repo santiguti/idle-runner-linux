@@ -172,7 +172,7 @@ def test_tail_skips_lines_that_are_not_json_objects(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(("routine", "doing"), [
     ("check_game_settings", "Checking the game's settings"), ("buy_tree", "Checking the Ascension Tree"),
-    ("send_minions", "Checking the minions"), ("auto_upgrade", "Shopping"), ("claim_quests", "Claiming quests"),
+    ("send_minions", "Checking the minions"), ("auto_upgrade", "Buying upgrades and equipment"), ("claim_quests", "Claiming quests"),
     ("ascend_bonus_sample", "Reading the ascension bonus"), ("auto_ascend", "Ascending"),
     ("circle_portals", "Taking a portal"), ("bonus_stage", "Playing Bonus Stage"),
     ("chest_hunt", "Playing Chest Hunt"), ("boss_knight", "Playing Knight boss fight"),

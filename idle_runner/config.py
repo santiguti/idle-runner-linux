@@ -28,6 +28,7 @@ class Settings:
     post_ascend_first_buy_seconds: int = 15
     ascend_bonus_sample_minutes: float = 2.5
     auto_buy_tree: bool = False
+    language: str = "auto"  # the window's: "auto" (the system's), "en" or "es"
     # [tree]
     tree_order: tuple[str, ...] = RECOMMENDED_ORDER
     # [minigames]
@@ -58,7 +59,7 @@ SECTIONS: dict[str, tuple[str, ...]] = {
     "general": ("jump_interval_ms", "circle_portals", "circle_portals_count", "disable_rage_without_soul_bonus",
                 "auto_buy_upgrades", "auto_buy_minutes", "auto_ascend", "auto_ascend_minutes",
                 "auto_ascend_percent", "post_ascend_first_buy_seconds", "ascend_bonus_sample_minutes",
-                "auto_buy_tree"),
+                "auto_buy_tree", "language"),
     "tree": ("tree_order",),
     "minigames": ("skip_bonus_stage", "no_lockpicking", "no_reinforced_crystal_saver", "perfect_chest_hunt"),
     "minions": ("work_benefits", "improved_work_conditions", "greeks_blessing"),
@@ -128,6 +129,8 @@ def check_ranges(path: Path, s: Settings) -> None:
         problems.append("post_ascend_first_buy_seconds must be >= 0")
     if not 0 <= s.color_tolerance <= 255:
         problems.append("color_tolerance must be 0-255")
+    if s.language not in ("auto", "en", "es"):
+        problems.append("language must be auto, en or es")
     if s.log_level not in ("DEBUG", "INFO", "WARNING"):
         problems.append("log_level must be DEBUG, INFO or WARNING")
     if not 0 <= s.blackbox_fps <= 30:

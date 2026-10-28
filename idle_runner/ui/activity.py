@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from idle_runner.blackbox import ANOMALIES
+from idle_runner.ui.i18n import node_name, t
 
 # The events that start a minigame (grep 'event("Start' idle_runner/minigames), and the name shown for each.
 MINIGAMES = {
@@ -17,13 +18,14 @@ MINIGAMES = {
     "Start of BossFight Victor": "Victor boss fight",
     "Start of Ascending Heights": "Ascending Heights",
 }
-# What the dashboard says the bot is doing while one of its routines runs (Game.routine's names). The
+# What the dashboard says the bot is doing while one of its routines runs (Game.routine's names), in English: the
+# window shows it through i18n.t. The
 # Megahorde's rage has none: it lasts 11 ms and fires ~45 times in 2 s at a Megahorde.
 DOING = {
     "check_game_settings": "Checking the game's settings",
     "buy_tree": "Checking the Ascension Tree",
     "send_minions": "Checking the minions",
-    "auto_upgrade": "Shopping",
+    "auto_upgrade": "Buying upgrades and equipment",
     "claim_quests": "Claiming quests",
     "ascend_bonus_sample": "Reading the ascension bonus",
     "auto_ascend": "Ascending",
@@ -99,50 +101,59 @@ def apply(session: Session, record: dict) -> None:
 
 
 def describe(record: dict, session: Session | None = None) -> tuple[str, str] | None:
-    """(kind, text) for the activity feed, or None for events that are only noise. kind is one of buy,
-    ascend, tree, minigame, box, quest, problem, state. `session` supplies the last "Ascend bonus"."""
+    """(kind, text) for the activity feed, in the window's language, or None for events that are only noise. kind
+    is one of buy, ascend, tree, minigame, box, quest, problem, state. `session` supplies the last "Ascend bonus"."""
     name = record.get("event", "")
     if name in ANOMALIES:
-        details = [str(record[key]) for key in DETAIL_FIELDS if key in record]
-        return "problem", f"{name}: {', '.join(details)}" if details else name
+        shown = {"reason": t, "setting": t, "node": node_name}
+        details = [shown.get(key, str)(str(record[key])) for key in DETAIL_FIELDS if key in record]
+        return "problem", f"{t(name)}: {', '.join(details)}" if details else t(name)
     if name == "AutoUpgrade Done":
-        parts = [f"{record.get('upgrades', 0)} upgrade" + ("s" if record.get("upgrades", 0) != 1 else ""),
-                 f"{record.get('equipment', 0)} equipment"]
-        parts = [p for p in parts if not p.startswith("0 ")]
-        return ("buy", "Bought " + " and ".join(parts)) if parts else None
+        upgrades, equipment = record.get("upgrades", 0), record.get("equipment", 0)
+        parts = []
+        if upgrades:
+            parts.append(t("{count} upgrade" if upgrades == 1 else "{count} upgrades", count=upgrades))
+        if equipment:
+            parts.append(t("{count} equipment", count=equipment))
+        if len(parts) == 2:
+            return "buy", t("Bought {first} and {second}", first=parts[0], second=parts[1])
+        return ("buy", t("Bought {first}", first=parts[0])) if parts else None
     if name == "Ascended":
         bonus = session.last_bonus if session else None
-        return "ascend", "Ascended" if bonus is None else f"Ascended (+{bonus}% bonus)"
+        return "ascend", t("Ascended") if bonus is None else t("Ascended (+{bonus}% bonus)", bonus=bonus)
     if name == "Ascend bonus":
-        return "ascend", f"Bonus: +{record.get('percent')}%"
+        return "ascend", t("Bonus: +{percent}%", percent=record.get("percent"))
     if name == "Tree node bought":
-        return "tree", f"Tree: bought {record.get('node')}"
+        return "tree", t("Tree: bought {node}", node=node_name(str(record.get("node"))))
     if name in MINIGAMES:
-        return "minigame", f"{MINIGAMES[name]} started"
+        return "minigame", t("{minigame} started", minigame=t(MINIGAMES[name]))
     if name == "Silver Box Collected":
-        return "box", "Silver Box collected"
+        return "box", t("Silver Box collected")
     if name == "Quest Claimed":
-        return "quest", "Quest claimed"
+        return "quest", t("Quest claimed")
     if name == "Extra daily quests taken":
-        return "quest", "Took 2 extra daily quests"
+        return "quest", t("Took 2 extra daily quests")
     if name == "Minion claimed":
-        return "buy", "A minion came back from its mission"
+        return "buy", t("A minion came back from its mission")
     if name == "Minion sent":
-        return "buy", f"Sent a minion ({record.get('cost')} SP)"
+        return "buy", t("Sent a minion ({cost} SP)", cost=record.get("cost"))
     if name == "Minion not sent" and record.get("reason") == "not enough SP":
-        return "buy", f"Minions: not enough SP to send one ({record.get('cost')} SP)"
+        return "buy", t("Minions: not enough SP to send one ({cost} SP)", cost=record.get("cost"))
     if name == "Game settings checked":  # a wrong or missing one is a problem of its own
-        return None if record.get("wrong") or record.get("missing") else ("state", "Game settings OK")
+        return None if record.get("wrong") or record.get("missing") else ("state", t("Game settings OK"))
     if name == "Game settings check skipped":
-        return "state", "Game settings: already checked today"
+        return "state", t("Game settings: already checked today")
     if name == "Tree stopped":
         if record.get("reason") == "not enough SP":
-            return "tree", f"Tree: next is {record.get('node')}, not enough SP"
-        return "tree", f"Tree stopped at {record.get('node')}: {record.get('reason')}"
-    if name in ("Bot started", "Bot stopped", "Resumed", "Game window found") or name.startswith("Paused: "):
-        return "state", name
+            return "tree", t("Tree: next is {node}, not enough SP", node=node_name(str(record.get("node"))))
+        return "tree", t("Tree stopped at {node}: {reason}", node=node_name(str(record.get("node"))),
+                         reason=t(str(record.get("reason"))))
+    if name in ("Bot started", "Bot stopped", "Resumed", "Game window found"):
+        return "state", t(name)
+    if name.startswith("Paused: "):
+        return "state", t("Paused: {reason}", reason=t(name.removeprefix("Paused: ")))
     if name == "Game unavailable":
-        return "state", f"Game unavailable: {record.get('reason', '')}"
+        return "state", t("Game unavailable: {reason}", reason=t(record.get("reason", "")))
     return None
 
 

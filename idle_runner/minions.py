@@ -10,6 +10,7 @@ from idle_runner.actions import TAB_SELECTED, open_ascension_tab
 from idle_runner.ascend_bonus import sp_amount
 from idle_runner.config import Settings
 from idle_runner.game import Game
+from idle_runner.game_settings import _bands
 from idle_runner.log import event
 
 SEND = (0x54, 0x17, 0x87)           # "Send on Mission (-N SP)"
@@ -17,7 +18,10 @@ AWAY = (0x97, 0x5D, 0xCA)           # "On a Mission..."
 # "Claim" when a mission is over: the shop's Unlock green (Santi, 2026-10-28; no screenshot of it yet).
 CLAIM = (0x11, 0xA6, 0x22)
 HEADER_DIGITS = (0xA6, 0x75, 0xFE)  # the header's "N available"
-BUTTON_X = 438                      # the buttons' left part, clear of their text
+# The buttons' left margin (client x 402-428): each of their rows has the button's colour somewhere in it, clear of
+# the text in English and Spanish ("Realizando una Misión ..." starts at client x 428 and crossed the single
+# column at 430 used before; 2026-10-28).
+BUTTON_LEFT, BUTTON_RIGHT = 410, 436
 LIST_TOP, LIST_BOTTOM = 136, 659    # the list between the header and the tab bar (client y 105-628)
 BUTTON_HEIGHT = 120                 # a whole button shows 123 px of its colour (client y 222-344)
 MAX_CLICKS = 10
@@ -44,27 +48,34 @@ def read_available_sp(game: Game) -> int | None:
 
 
 def read_mission_cost(game: Game, top: int) -> int | None:
-    """The cost on the send button whose top edge is at `top`: its third line, "(-10 SP)" in white."""
-    line = game.grab(428, top + 79, 618, top + 97)  # client x 420-609
-    white = (line == 255).all(axis=2)
-    columns = white.any(axis=0)
-    x = 0
-    while x < len(columns):
-        if not columns[x]:
-            x += 1
-            continue
-        start = x
-        while x < len(columns) and columns[x]:
-            x += 1
-        rows = white[:, start:x].any(axis=1).nonzero()[0]
-        if rows[-1] - rows[0] <= 1:  # the "-", 1 px tall: the digits follow
-            return sp_amount(white[:, x:], line[:, x:])
+    """The cost on the send button whose top edge is at `top`: the white line with "(-10 SP)", the button's third
+    line in English and its second in Spanish ("Dar Misión (-1,000 SP)", 2026-10-28)."""
+    # Client x 415-591: inside the button in both layouts (English 415-613, Spanish 398-597), clear of the reward bar
+    # beside it and of the list's scrollbar right of the Spanish one.
+    button = game.grab(423, top, 599, top + BUTTON_HEIGHT)
+    white = (button == 255).all(axis=2)
+    for first, end in _bands(white):
+        line, mask = button[first:end], white[first:end]
+        columns = mask.any(axis=0)
+        x = 0
+        while x < len(columns):
+            if not columns[x]:
+                x += 1
+                continue
+            start = x
+            while x < len(columns) and columns[x]:
+                x += 1
+            rows = mask[:, start:x].any(axis=1).nonzero()[0]
+            if rows[-1] - rows[0] <= 1:  # the "-", 1 px tall: the digits follow
+                cost = sp_amount(mask[:, x:], line[:, x:])
+                if cost is not None:
+                    return cost  # else a 1 px piece of another glyph ("(" has one): the dash may follow
     return None
 
 
 def send_buttons(game: Game, color: tuple[int, int, int] = SEND) -> list[int]:
     """The top edges of the send buttons (or of buttons of `color`) wholly inside the list, from the top."""
-    column = (game.grab(BUTTON_X, LIST_TOP, BUTTON_X, LIST_BOTTOM)[:, 0] == color).all(axis=1)
+    column = (game.grab(BUTTON_LEFT, LIST_TOP, BUTTON_RIGHT, LIST_BOTTOM) == color).all(axis=2).any(axis=1)
     tops, y = [], 0
     while y < len(column):
         if column[y]:
@@ -75,6 +86,19 @@ def send_buttons(game: Game, color: tuple[int, int, int] = SEND) -> list[int]:
                 tops.append(LIST_TOP + start)
         y += 1
     return tops
+
+
+def minions_shown(game: Game) -> bool:
+    """Wait up to 2 s for the Minions tab: its shade and a button of a known colour. The shade fades in (200 ms
+    after the click it still hadn't when the tree had just switched tabs, live 2026-10-28 02:43), and alone it
+    misled once: it stayed on Minions over the Ascension tab's list after a lost click (19:25)."""
+    deadline = game.now() + 2000
+    while game.now() <= deadline:
+        if (game.pixel_search(332, 676, 332, 676, TAB_SELECTED, variation=6)
+                and any(send_buttons(game, color) for color in (SEND, AWAY, CLAIM))):
+            return True
+        game.sleep(20)
+    return False
 
 
 def send_minions(game: Game) -> list[int]:
@@ -88,19 +112,20 @@ def send_minions(game: Game) -> list[int]:
     if not open_ascension_tab(game):
         game.click(570, 694)  # exit
         return sent
-    game.click(332, 680)  # minions tab
-    # Its shade fades in: 200 ms after the click it still hadn't when the tree had just switched tabs (live,
-    # 2026-10-28 02:43), so wait for it as Shop.tab_shown does.
-    deadline = game.now() + 2000
-    while game.pixel_search(332, 676, 332, 676, TAB_SELECTED, variation=6) is None and game.now() < deadline:
-        game.sleep(20)
-    if game.pixel_search(332, 676, 332, 676, TAB_SELECTED, variation=6) is None:
-        event("Minions tab not shown")
+    for attempt in range(2):
+        if attempt:
+            event("Shop click retried", target="minions")
+        game.click(332, 680)  # minions tab
+        if minions_shown(game):
+            break
+    else:
+        if game.pixel_search(332, 676, 332, 676, TAB_SELECTED, variation=6) is None:
+            event("Minions tab not shown")
+        else:
+            event("Minions buttons unknown")
+            game.save_frame("minions-buttons-unknown")
         game.click(570, 694)  # exit
         return sent
-    if not any(send_buttons(game, color) for color in (SEND, AWAY, CLAIM)):
-        event("Minions buttons unknown")
-        game.save_frame("minions-buttons-unknown")
     for _ in range(MAX_CLICKS):
         claims = send_buttons(game, CLAIM)
         if claims:

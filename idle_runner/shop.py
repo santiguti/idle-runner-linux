@@ -14,7 +14,10 @@ SCROLLBAR_GRAY = 0xD6D6D6  # scrollbar track at x = 1260
 SCROLLBAR_TRACK_1254 = 0xA0A0A0
 # Shop tabs (measured 2026-10-22): the selected tab's background is darker, and only the Upgrades tab
 # has the grey "Buy all available" bar where the Equipment tab has its "Max" button (1180, 636).
-BUY_ALL_BAR = 0xA5A5A5             # A1A1A1-A8A8A8 at (1180, 636)
+BUY_ALL_BAR = 0xA5A5A5             # A1A1A1-A8A8A8
+# Its right end, clear of its text in English and Spanish ("Compra todo lo disponible" covers (1180, 636));
+# x 1208-1268 is that grey on no other tab (recorded tab bars, 2026-10-28).
+BUY_ALL_POINT = (1240, 636)
 # The tab bar on y = 700 (measured 2026-10-25, before and after the Ultra Ascension):
 #   six tabs:  Equipment 820-889, Upgrades 896-965, Quests 972-1041, Jewels 1048-1117, ⋮ 1124-1192, X 1200-1268
 #   five tabs: Equipment 820-904, Upgrades 911-995, Jewels 1002-1086, ⋮ 1093-1177, X 1184-1268
@@ -183,7 +186,7 @@ class Shop:
         def showing() -> bool:
             armor = selected(820)
             upgrades = selected(915)
-            buy_all = g.pixel_search(1180, 636, 1180, 636, BUY_ALL_BAR, variation=4) is not None
+            buy_all = g.pixel_search(*BUY_ALL_POINT, *BUY_ALL_POINT, BUY_ALL_BAR, variation=4) is not None
             if tab == "armor":
                 return armor and not buy_all
             if tab == "upgrades":
