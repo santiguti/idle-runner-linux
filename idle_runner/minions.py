@@ -8,6 +8,7 @@ button's glow (it glows while ascending is "Recommended"), not minions coming ba
 """
 from idle_runner.actions import TAB_SELECTED, open_ascension_tab
 from idle_runner.ascend_bonus import sp_amount
+from idle_runner.config import Settings
 from idle_runner.game import Game
 from idle_runner.log import event
 
@@ -20,6 +21,20 @@ BUTTON_X = 438                      # the buttons' left part, clear of their tex
 LIST_TOP, LIST_BOTTOM = 136, 659    # the list between the header and the tab bar (client y 105-628)
 BUTTON_HEIGHT = 120                 # a whole button shows 123 px of its colour (client y 222-344)
 MAX_CLICKS = 10
+# Mission minutes by cost in SP, which is fixed per minion (wiki, Minions): White Knight, Dark Wizard, Skeleton,
+# Goo Mutant, Stone Golem. The Ninja and the Cyclops cost "50 B" and "100 B", which never read.
+MISSION_MINUTES = {10: 180, 150: 390, 1_000: 180, 1_500: 270, 3_000: 1_380}
+# Divinities that make missions faster. They add up and shorten the mission: with the first two the White
+# Knight takes "under 2 hours" (wiki), 3 h x (1 - 0.35).
+SPEEDUPS = {"work_benefits": 0.15, "improved_work_conditions": 0.20, "greeks_blessing": 0.25}
+
+
+def mission_ms(cost: int, settings: Settings) -> float | None:
+    """How long the mission that costs `cost` SP takes, or None for a cost the table doesn't have."""
+    minutes = MISSION_MINUTES.get(cost)
+    if minutes is None:
+        return None
+    return minutes * 60_000 * (1 - sum(share for name, share in SPEEDUPS.items() if getattr(settings, name)))
 
 
 def read_available_sp(game: Game) -> int | None:
@@ -62,22 +77,23 @@ def send_buttons(game: Game, color: tuple[int, int, int] = SEND) -> list[int]:
     return tops
 
 
-def send_minions(game: Game) -> None:
+def send_minions(game: Game) -> list[int]:
     """Claim the minions back from their missions, then send every minion whose mission the unspent SP
     covers. Claims cost nothing; each send is checked against the header's SP:
     without enough, the game may offer to pay the rest with jewels (the tree did, 2026-10-26). The list
     moves when a minion leaves (the Daily Bonus banner above it changes), so the buttons are found again
     after each send. Only the buttons on screen are seen: the list holds two whole ones, enough for the
-    White Knight and the Dark Wizard (the Daily Bonus isn't taken yet)."""
+    White Knight and the Dark Wizard (the Daily Bonus isn't taken yet). Returns the costs of the missions sent."""
+    sent: list[int] = []
     if not open_ascension_tab(game):
         game.click(570, 694)  # exit
-        return
+        return sent
     game.click(332, 680)  # minions tab
     game.sleep(200)
     if game.pixel_search(332, 676, 332, 676, TAB_SELECTED, variation=6) is None:
         event("Minions tab not shown")
         game.click(570, 694)  # exit
-        return
+        return sent
     if not any(send_buttons(game, color) for color in (SEND, AWAY, CLAIM)):
         event("Minions buttons unknown")
         game.save_frame("minions-buttons-unknown")
@@ -91,7 +107,7 @@ def send_minions(game: Game) -> None:
                     event("Minion not claimed")
                     game.save_frame("minion-claim-no-effect")
                     game.click(570, 694)  # exit
-                    return
+                    return sent
                 game.sleep(50)
             event("Minion claimed")
             continue
@@ -118,7 +134,9 @@ def send_minions(game: Game) -> None:
                 event("Minion not sent", reason="no effect", cost=cost)
                 game.save_frame("minion-send-no-effect")
                 game.click(570, 694)  # exit
-                return
+                return sent
             game.sleep(50)
         event("Minion sent", cost=cost)
+        sent.append(cost)
     game.click(570, 694)  # exit
+    return sent

@@ -19,7 +19,7 @@ class Field:
     warning: str = ""
 
 
-CARDS = ("Playing", "Shopping", "Ascending", "Ascension Tree", "Minigames", "Crafting", "Advanced")
+CARDS = ("Playing", "Shopping", "Ascending", "Ascension Tree", "Minions", "Minigames", "Crafting", "Advanced")
 ZONES = ("Hills", "Hot Desert", "Jungle", "Frozen Fields", "Funky", "Modern City", "Factory", "Valley", "Castle")
 
 FIELDS: dict[str, Field] = {
@@ -59,6 +59,13 @@ FIELDS: dict[str, Field] = {
     "auto_buy_tree": Field("Buy Ascension Tree nodes",
                            "At start and after every ascension, in the order of the Tree order page.",
                            "Ascension Tree", "toggle", warning="Spends your Slayer Points."),
+    # Minions
+    "work_benefits": Field("I have Work Benefits", "The Divinity that makes missions 15% faster: the bot "
+                           "checks the minions back sooner.", "Minions", "toggle"),
+    "improved_work_conditions": Field("I have Improved Work Conditions", "The Divinity that makes missions 20% "
+                                      "faster.", "Minions", "toggle"),
+    "greeks_blessing": Field("I have Greeks Blessing", "The Divinity that makes missions 25% faster.", "Minions",
+                             "toggle"),
     # Minigames
     "skip_bonus_stage": Field("Skip bonus stages", "Waits for them to end instead of playing.", "Minigames",
                               "toggle"),

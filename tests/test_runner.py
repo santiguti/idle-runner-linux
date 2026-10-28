@@ -524,34 +524,50 @@ def test_the_main_loop_never_clicks_second_wind(game, fake, jumper) -> None:
     assert (560, 600) not in fake.clicks()
 
 
-def test_minions_are_sent_at_the_first_slow_check_after_each_tree_run_and_every_30_minutes(
+def test_minions_are_visited_at_start_after_each_tree_run_and_hourly_while_no_return_is_known(
         game, fake, jumper, monkeypatch) -> None:
-    sent: list[float] = []
-    monkeypatch.setattr(runner_module, "send_minions", lambda g: sent.append(fake.t))
+    visits: list[float] = []
+    monkeypatch.setattr(runner_module, "send_minions", lambda g: visits.append(fake.t) or [])
     runner = Runner(game, replace(Settings(), auto_buy_tree=False), jumper)
     fake.t += 6_000
     runner.tick()  # the first slow check: the node may have been bought by hand
     fake.t += 6_000
     runner.tick()
-    assert len(sent) == 1
+    assert len(visits) == 1
 
     runner.tree_due = True
     runner.s = replace(runner.s, auto_buy_tree=True)
     monkeypatch.setattr(runner.tree, "buy", lambda: None)
     fake.t += 6_000
     runner.tick()  # the tree may have just bought a minion
-    assert len(sent) == 2
+    assert len(visits) == 2
 
-    fake.t += 30 * 60_000
-    runner.tick()
-    assert len(sent) == 3
+    fake.t += 60 * 60_000
+    runner.tick()  # nothing sent, so no return is known: an hourly look
+    assert len(visits) == 3
+
+
+def test_minions_are_visited_again_when_their_mission_ends(game, fake, jumper, monkeypatch) -> None:
+    sends = iter([[10], [], []])
+    visits: list[float] = []
+    monkeypatch.setattr(runner_module, "send_minions", lambda g: visits.append(fake.t) or next(sends))
+    runner = Runner(game, replace(Settings(), work_benefits=True), jumper)  # 3 h x 0.85 = 153 min
+    fake.t += 6_000
+    runner.tick()  # sends the White Knight
+    fake.t += 153 * 60_000
+    runner.tick()  # not back yet, and no hourly look while a return is known
+    assert len(visits) == 1
+
+    fake.t += 2 * 60_000
+    runner.tick()  # back (a minute's margin)
+    assert len(visits) == 2
 
 
 def test_the_ascension_button_glow_starts_no_minion_routine(game, fake, jumper, monkeypatch) -> None:
     # The original's "minions are back" (99, 113) is the Ascension button's glow on this version: it glows
     # while ascending is "Recommended" and fired with no minions at all (2026-10-28 00:15:03).
     sent: list[float] = []
-    monkeypatch.setattr(runner_module, "send_minions", lambda g: sent.append(fake.t))
+    monkeypatch.setattr(runner_module, "send_minions", lambda g: sent.append(fake.t) or [])
     runner = Runner(game, Settings(), jumper)
     fake.t += 6_000
     runner.tick()

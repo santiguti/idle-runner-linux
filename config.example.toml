@@ -49,6 +49,11 @@ no_reinforced_crystal_saver = false      # true only if you DON'T own the Reinfo
 perfect_chest_hunt = false               # riskier strategy that goes for Perfect Chest Hunts: ignores the
                                          # life saver until a 2x shows (turn the 2x2x Dark Divinity off)
 
+[minions]                                # the Divinities you own that make missions faster, so the bot
+work_benefits = false                    # knows when each minion is back (+15%)
+improved_work_conditions = false         # +20%
+greeks_blessing = false                  # +25%
+
 [crafting]
 craft_soul_bonus = false                 # Souls Compass at Megahorde + Soul Bonus
 craft_rage_pill = false                  # Rage Pill at Megahorde + Soul Bonus

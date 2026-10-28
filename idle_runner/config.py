@@ -36,6 +36,10 @@ class Settings:
     no_lockpicking: bool = True
     no_reinforced_crystal_saver: bool = False
     perfect_chest_hunt: bool = False
+    # [minions]: the Divinities that make missions faster, so the bot knows when each minion is back
+    work_benefits: bool = False
+    improved_work_conditions: bool = False
+    greeks_blessing: bool = False
     # [crafting]
     craft_soul_bonus: bool = False
     craft_rage_pill: bool = False
@@ -58,6 +62,7 @@ SECTIONS: dict[str, tuple[str, ...]] = {
                 "auto_buy_tree"),
     "tree": ("tree_order",),
     "minigames": ("skip_bonus_stage", "no_lockpicking", "no_reinforced_crystal_saver", "perfect_chest_hunt"),
+    "minions": ("work_benefits", "improved_work_conditions", "greeks_blessing"),
     "crafting": ("craft_soul_bonus", "craft_rage_pill", "craft_dimensional_staff", "craft_bidimensional_staff"),
     "debug": ("log_dir", "log_level", "save_frames", "blackbox_fps", "blackbox_minutes"),
 }

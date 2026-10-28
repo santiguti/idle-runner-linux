@@ -144,3 +144,11 @@ def test_an_array_for_any_other_setting_is_a_type_error(tmp_path) -> None:
 def test_tree_order_belongs_in_the_tree_section(tmp_path) -> None:
     with pytest.raises(ValueError, match=r"'tree_order' belongs in \[tree\], not \[general\]"):
         load_settings(write(tmp_path, '[general]\ntree_order = ["Portals"]\n'))
+
+
+def test_minion_divinities_are_off_by_default(tmp_path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text("[minions]\nwork_benefits = true\n")
+    settings = load_settings(path)
+
+    assert settings.work_benefits and not settings.improved_work_conditions and not settings.greeks_blessing

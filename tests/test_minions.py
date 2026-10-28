@@ -1,9 +1,11 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from idle_runner import minions
-from idle_runner.minions import read_available_sp, read_mission_cost, send_buttons, send_minions
+from idle_runner.config import Settings
+from idle_runner.minions import mission_ms, read_available_sp, read_mission_cost, send_buttons, send_minions
 from tests.fakes import OFFSET, read_png
 
 FIXTURES = Path(__file__).parent / "fixtures" / "minions"
@@ -80,8 +82,8 @@ def play_minions_tab(fake, monkeypatch, available: int | None, takes_effect: boo
 
 def test_sends_every_minion_the_sp_covers(game, fake, monkeypatch, event_names) -> None:
     sent = play_minions_tab(fake, monkeypatch, available=526)
-    send_minions(game)
 
+    assert send_minions(game) == [10, 150]  # the costs it sent: they tell when each mission ends
     assert sent == [10, 150]
     assert event_names().count("Minion sent") == 2
     assert fake.clicks()[-1] == (570, 694)  # closed the panel
@@ -185,3 +187,22 @@ def test_a_claim_without_effect_is_not_clicked_again(game, fake, monkeypatch, ev
 
     assert len([c for c in fake.clicks() if in_button(c, WHITE_KNIGHT)]) == 1
     assert "Minion not claimed" in event_names()
+
+
+@pytest.mark.parametrize(("divinities", "minutes"), [
+    ((), 180),
+    (("work_benefits", "improved_work_conditions"), 117),  # wiki: "under 2 hours" with these two
+    (("work_benefits", "improved_work_conditions", "greeks_blessing"), 72),
+])
+def test_a_white_knight_mission_lasts_3_hours_less_the_divinities(divinities: tuple[str, ...], minutes: int) -> None:
+    settings = replace(Settings(), **{name: True for name in divinities})
+
+    assert mission_ms(10, settings) == pytest.approx(minutes * 60_000)
+
+
+def test_each_mission_cost_tells_its_length() -> None:
+    # Wiki, Minions: White Knight 10 SP 3h00m, Dark Wizard 150 SP 6h30m, Skeleton 1,000 SP 3h00m,
+    # Goo Mutant 1,500 SP 4h30m, Stone Golem 3,000 SP 23h00m.
+    assert [mission_ms(cost, Settings()) for cost in (10, 150, 1_000, 1_500, 3_000)] == [
+        m * 60_000 for m in (180, 390, 180, 270, 1_380)]
+    assert mission_ms(42, Settings()) is None

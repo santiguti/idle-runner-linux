@@ -10,7 +10,7 @@ from idle_runner.config import Settings
 from idle_runner.game import Game
 from idle_runner.log import event, log
 from idle_runner.minigames.chest_hunt import chest_hunt
-from idle_runner.minions import send_minions
+from idle_runner.minions import mission_ms, send_minions
 from idle_runner.minigames.bonus_stage import bonus_stage
 from idle_runner.minigames.boss import boss_fight_knight, boss_fight_victor
 from idle_runner.minigames.ascending_heights import ascending_heights
@@ -24,7 +24,8 @@ EXPECTED_SIZE = (1280, 720)
 WINDOW_RETRY_MS = 2000  # how often to look for the game window again after it is gone
 BOX_RETRY_MS = 15_000  # buy again this soon after a Random Box stopped a buy
 SIX_COIN_TIMEOUT_MS = 120_000  # buy anyway if the counter stays unreadable this long after reading < 6
-MINIONS_EVERY_MS = 30 * 60_000  # missions take 3 h or more (wiki); also after each tree run
+MINIONS_EVERY_MS = 60 * 60_000  # while no mission end is known (missions sent by hand or before a restart)
+MINIONS_MARGIN_MS = 60_000  # look a minute after a mission should end
 MAX_CONSECUTIVE_CRASHES = 5  # unexpected errors in a row before giving up (e.g. the game window is gone)
 
 
@@ -47,6 +48,7 @@ class Runner:
         self.minions_due = True  # once at start too: the node may have been bought by hand
         now = game.now()
         self.timer_minions = now
+        self.minions_back: list[float] = []  # when the missions the bot sent end
         self.last_slow = now
         self.timer_buy = now
         self.timer_ascend = now
@@ -202,10 +204,16 @@ class Runner:
                 self.tree_due = False
                 self._routine("buy_tree", self.tree.buy)
                 self.minions_due = True  # it may have just bought a minion
-            if self.minions_due or g.now() - self.timer_minions > MINIONS_EVERY_MS:
+            back = any(t <= g.now() for t in self.minions_back)
+            hourly = not self.minions_back and g.now() - self.timer_minions > MINIONS_EVERY_MS
+            if self.minions_due or back or hourly:
                 self.minions_due = False
                 self.timer_minions = g.now()
-                self._routine("send_minions", lambda: send_minions(g))
+                self.minions_back = [t for t in self.minions_back if t > g.now()]
+                for cost in self._routine("send_minions", lambda: send_minions(g)):
+                    length = mission_ms(cost, s)
+                    if length is not None:
+                        self.minions_back.append(g.now() + length + MINIONS_MARGIN_MS)
 
     def buy(self) -> None:
         """AutoUpgrade; if a Random Box stopped it or the shop didn't open, buy again in BOX_RETRY_MS
