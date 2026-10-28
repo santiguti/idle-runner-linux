@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Idle Runner, an Idle Slayer bot</title>
-<meta name="description" content="A free, open-source Idle Slayer bot for Linux and Windows. It plays by looking at the screen and pressing keys, like you would.">
-<meta property="og:title" content="Idle Runner, an Idle Slayer bot">
+<title>Idle Runner: Idle Slayer bot and auto clicker for Linux and Windows</title>
+<meta name="description" content="A free, open-source Idle Slayer bot for Linux and Windows. It plays while you're AFK: jumps, buys upgrades, plays the minigames and ascends by reading the screen. It never touches the game's memory or files.">
+<meta name="google-site-verification" content="YlcsuqXLsw6tF97Dkd7N-m231zilA92sx6ydpRYDbY8">
+<link rel="canonical" href="https://santiguti.github.io/idle-slayer-bot/">
+<meta property="og:title" content="Idle Runner: Idle Slayer bot for Linux and Windows">
 <meta property="og:description" content="Plays Idle Slayer for you on Linux and Windows. Free and open source.">
 <meta property="og:image" content="https://santiguti.github.io/idle-slayer-bot/images/banner.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Crect width='8' height='8' fill='%23f5c542'/%3E%3Crect x='2' y='2' width='4' height='4' fill='%23ffe28a'/%3E%3C/svg%3E">
@@ -121,6 +123,7 @@
   h2 { font: 700 2.1rem/1.1 var(--pixel); margin: 0 0 24px; }
   h3 { font: 700 1.3rem/1.2 var(--pixel); margin: 0 0 12px; }
 
+  .intro { color: var(--muted); margin: -12px 0 24px; max-width: 60ch; }
   .does { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 0 48px; margin: 0; }
   .does div { border-top: 2px solid var(--rule); padding: 14px 0 16px; }
   .does dt { font-weight: 700; }
@@ -162,7 +165,7 @@
   <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
   <div class="hero">
     <h1>Idle Runner</h1>
-    <p class="lede">Plays Idle Slayer for you on Linux and Windows, by looking at the screen and pressing keys.</p>
+    <p class="lede">An Idle Slayer bot for Linux and Windows. It plays for you while you're AFK, by looking at the screen and pressing keys.</p>
     <div class="download">
       <a class="btn" id="primary" href="https://github.com/santiguti/idle-slayer-bot/releases">Download for Linux</a>
       <a class="alt" id="secondary" href="https://github.com/santiguti/idle-slayer-bot/releases">or for Windows (beta)</a>
@@ -181,6 +184,7 @@
 
   <section>
     <h2>What it does</h2>
+    <p class="intro">More than an auto clicker: it reads the screen, so it reacts to what the game shows.</p>
     <dl class="does">
       <div><dt>Runs</dt><dd>Jumps and boosts nonstop, at the rate you choose.</dd></div>
       <div><dt>Collects</dt><dd>Silver and orange boxes, minions and the daily bonus.</dd></div>
