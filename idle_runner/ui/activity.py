@@ -101,6 +101,8 @@ def describe(record: dict, session: Session | None = None) -> tuple[str, str] | 
         return "box", "Silver Box collected"
     if name == "Quest Claimed":
         return "quest", "Quest claimed"
+    if name == "Extra daily quests taken":
+        return "quest", "Took 2 extra daily quests"
     if name in ("Bot started", "Bot stopped", "Resumed", "Game window found") or name.startswith("Paused: "):
         return "state", name
     if name == "Game unavailable":

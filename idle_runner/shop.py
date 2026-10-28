@@ -1,4 +1,6 @@
 """Shop routines ported from Idle Runner.au3: AutoUpgrade, BuyUpgrade, BuyEquipment, ClaimQuests, AutoAscend."""
+import time
+
 import numpy as np
 
 from idle_runner.actions import TAB_SELECTED, box_on_screen, open_ascension_tab
@@ -28,6 +30,11 @@ QUEST_REWARD_GREY = 0x7A7A7A
 # The Quests tab's icon: E03C28 at rest (639 frames recorded 2026-10-22, green always 0x3C). While something
 # can be claimed it pulses towards ED8C18 (green up to 0xA5) about once a second, selected or not.
 QUESTS_ICON = (1000, 690)
+# Not in the original (measured 2026-10-27): the free "+2" button beside the Daily Quests header adds two
+# Daily Quests until the next reset, then disappears. Solid 379D37 at x = 1188, 32 px tall (466-497 under
+# Phantom Fall's event quests); the header around it is 2A1203, claim buttons are 11A622.
+EXTRA_DAILIES_GREEN = 0x379D37
+EXTRA_DAILIES_X = 1188
 WHEEL_PX = 50  # one wheel notch scrolls a shop list by 50 px
 # The ascension panel since the Ultra Ascension node was bought (measured 2026-10-23, client x): Ascend
 # 92-307, Ultra Ascend 332-549. The original's confirm click (550, 580) is client (542, 549), inside Ultra
@@ -39,6 +46,13 @@ ASCEND_YES = 0x00A400
 CANT_ASCEND_CLOSE = 0xAF0000
 ASCEND_ICON = 0xA328B3  # magenta of the dialogs' Ascension icon; Ultra Ascend is cyan and dark blue
 FIRST_SEPARATOR_Y = 153  # line above the first Upgrades row when the list is at its top
+
+
+def daily_quests_day() -> int:
+    """The current Daily Quests day. They reset at 00:00 UTC (21:00 in Argentina: the wiki, and the "New in"
+    countdown on 2026-10-26). The day starts 10 minutes late here, so a look just before the reset never
+    counts for the new day."""
+    return int((time.time() - 600) // 86400)
 
 
 class BoxOnScreen(Exception):
@@ -106,6 +120,7 @@ class Shop:
         self.upgrades_bought = 0
         self.equipment_buys = 0
         self.opened = False  # whether the last auto_upgrade got the shop open
+        self.dailies_day: int | None = None  # the Daily Quests day whose "+2" was taken or looked for
 
     def close_if_open(self) -> None:
         """Close the shop if it's open, then wait for it to finish closing.
@@ -356,8 +371,9 @@ class Shop:
             g.sleep(30)
 
     def finish_visit(self) -> None:
-        """Close the shop after buying, claiming first if the Quests tab glows: one visit instead of two."""
-        if self.has_quests_tab() and self.quests_claimable():
+        """Close the shop after buying, claiming first if the Quests tab glows: one visit instead of two.
+        Once a Daily Quests day it goes through the Quests tab anyway, for the "+2" button."""
+        if self.has_quests_tab() and (self.dailies_day != daily_quests_day() or self.quests_claimable()):
             event("Claiming quest")
             self.claim_in_shop()
         self.game.click(1222, 677)  # close the shop
@@ -378,6 +394,7 @@ class Shop:
         while True:
             found = g.pixel_search(1160, 270, 1160, 590, 0x11A622, variation=10)
             if found is None:
+                self.take_extra_dailies()
                 g.move(1267, 270)
                 g.wheel(up=False, notches=1)
                 if not g.pixel_is(1267, 658, 0xA0A0A0):  # no gray scrollbar
@@ -395,7 +412,30 @@ class Shop:
             if g.now() > deadline:
                 g.stuck("claim_quests")
                 break
+        self.dailies_day = daily_quests_day()
         g.save_frame("claim-quests-end")
+
+    def take_extra_dailies(self) -> None:
+        """With the Quests tab showing: click the "+2" beside the Daily Quests header, once a Daily Quests
+        day. Not in the original (user's request, 2026-10-28). The click must land on the button: with only
+        its bottom showing under the list's top edge, 15 px lower is the first daily quest's Reroll."""
+        g = self.game
+        found = g.pixel_search(EXTRA_DAILIES_X, 160, EXTRA_DAILIES_X, 620, EXTRA_DAILIES_GREEN, variation=6)
+        if found is None or self.dailies_day == daily_quests_day():
+            return
+        x, y = found[0], found[1] + 15  # the button's middle
+        if not g.pixel_search(x, y, x, y, EXTRA_DAILIES_GREEN, variation=6):
+            return
+        self.dailies_day = daily_quests_day()
+        event("Extra daily quests taken")
+        g.click(x, y)
+        settle = g.now() + 2000
+        while g.pixel_search(x, y, x, y, EXTRA_DAILIES_GREEN, variation=6):
+            if g.now() > settle:
+                event("Extra daily quests click had no effect")
+                break
+            g.sleep(50)
+        g.save_frame("extra-daily-quests")
 
     def sample_ascend_bonus(self, keep_open_at: float | None = None) -> float | None:
         """Open the Ascension tab, read the Ascend button's "+X% CpS bonus" and close the panel. Not in

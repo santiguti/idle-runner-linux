@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from idle_runner.actions import open_ascension_tab
+from idle_runner import shop as shop_module
 from idle_runner.shop import QUEST_REWARD_BLUE, BoxOnScreen, Shop, first_row_after_quest_rewards, scroll_to_top
 from tests.fakes import OFFSET, read_png
 
@@ -492,6 +493,7 @@ def test_buy_upgrade_clicks_the_tab_again_when_a_click_is_lost(game, fake, event
     ignore_first_click_at(fake, 927, 683, lambda: show_tab(fake, "upgrades"))
     shop = Shop(game)
     shop.loop_amount = 6
+    shop.dailies_day = shop_module.daily_quests_day()  # no Quests visit for the "+2"
     shop.buy_upgrade()
 
     assert fake.clicks().count((927, 683)) == 2
@@ -714,6 +716,7 @@ def test_claim_quests_without_a_glowing_quests_tab_claims_nothing(game, fake, ev
 
 def test_a_buy_claims_quests_in_the_same_visit(game, fake, monkeypatch) -> None:
     shop = Shop(game)
+    shop.dailies_day = shop_module.daily_quests_day()  # the "+2" was already looked for today
     claimed = []
     monkeypatch.setattr(shop, "claim_in_shop", lambda: claimed.append(fake.t))
     show_tab(fake, "upgrades")
@@ -758,3 +761,64 @@ def test_claim_clicks_each_button_once(game, fake) -> None:
     Shop(game).claim_quests()
 
     assert fake.clicks().count((1160, 300)) == 1
+
+
+def paint_daily_quests_header(fake, name: str) -> None:
+    """The Daily Quests header recorded under Phantom Fall's event quests (client x 800-1269, y 420-479):
+    "plus-2" with the free "+2" button (2026-10-27), "taken" after the user clicked it (2026-10-26)."""
+    fake.frame[420:480, 800:1270] = read_png(Path(__file__).parent / "fixtures" / "daily_quests" / f"{name}.png")
+
+
+@pytest.mark.parametrize(("name", "button"), [("plus-2", True), ("taken", False)])
+def test_extra_daily_quests_button_on_recorded_frames(game, fake, event_names, name: str, button: bool) -> None:
+    paint_daily_quests_header(fake, name)
+    fake.on_action = lambda a: fake.paint(1179, 466, 0x2A1203, w=67, h=32) if a[0] == "click" else None  # gone
+    Shop(game).take_extra_dailies()
+
+    assert fake.clicks() == ([(1188, 481)] if button else [])
+    assert ("Extra daily quests taken" in event_names()) is button
+    assert "Extra daily quests click had no effect" not in event_names()
+
+
+def test_extra_daily_quests_are_clicked_once_a_day_even_when_the_button_stays(game, fake, event_names) -> None:
+    paint_daily_quests_header(fake, "plus-2")
+    shop = Shop(game)
+    shop.take_extra_dailies()
+    shop.take_extra_dailies()
+
+    assert fake.clicks() == [(1188, 481)]
+    assert "Extra daily quests click had no effect" in event_names()
+
+
+def test_extra_daily_quests_button_cut_off_by_the_list_top_is_not_clicked(game, fake) -> None:
+    # Only its bottom shows: 15 px under the first green pixel is the Reroll button of the first daily quest.
+    paint_daily_quests_header(fake, "plus-2")
+    fake.paint(1179, 466, 0x000000, w=67, h=25)
+    Shop(game).take_extra_dailies()
+
+    assert fake.clicks() == []
+
+
+def test_claiming_takes_the_extra_daily_quests(game, fake) -> None:
+    fake.paint(807, 145, 0xFFFFFF)  # the shop is open
+    show_tab(fake, "quests")
+    fake.paint(1000, 690, 0xED8C18)  # the Quests tab glows: something to claim
+    paint_daily_quests_header(fake, "plus-2")
+    Shop(game).claim_quests()
+
+    assert (1188, 481) in fake.clicks()
+
+
+def test_a_buy_visits_the_quests_tab_once_a_daily_quests_day(game, fake, monkeypatch) -> None:
+    # Even with nothing to claim, for the "+2" Daily Quests button.
+    day = [20390]
+    monkeypatch.setattr(shop_module, "daily_quests_day", lambda: day[0])
+    show_tab(fake, "quests")
+    fake.paint(1000, 690, 0xE03C28)  # the Quests tab at rest: nothing to claim
+    shop = Shop(game)
+    shop.finish_visit()
+    shop.finish_visit()
+    day[0] += 1
+    shop.finish_visit()
+
+    assert fake.clicks().count((1000, 690)) == 2

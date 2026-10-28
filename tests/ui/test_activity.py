@@ -87,6 +87,7 @@ def test_texts() -> None:
         ({"event": "Chesthunt Started"}, ("minigame", "Chest Hunt started")),
         ({"event": "Silver Box Collected"}, ("box", "Silver Box collected")),
         ({"event": "Quest Claimed"}, ("quest", "Quest claimed")),
+        ({"event": "Extra daily quests taken"}, ("quest", "Took 2 extra daily quests")),
         ({"event": "Sync timeout", "where": "BonusStage2-s1", "timeout_ms": 15000},
          ("problem", "Sync timeout: BonusStage2-s1")),
         ({"event": "Tree node not bought", "node": "Village Key"}, ("problem", "Tree node not bought: Village Key")),
