@@ -4,12 +4,13 @@ import signal
 from collections.abc import Callable
 
 from idle_runner.actions import (BIDIMENSIONAL_STAFF, DIMENSIONAL_STAFF, RAGE_PILL, SOUL_COMPASS,
-                                 buy_temp_item, close_all, collect_minions, soul_bonus_active)
+                                 buy_temp_item, close_all, soul_bonus_active)
 from idle_runner.coins import read_coins
 from idle_runner.config import Settings
 from idle_runner.game import Game
 from idle_runner.log import event, log
 from idle_runner.minigames.chest_hunt import chest_hunt
+from idle_runner.minions import send_minions
 from idle_runner.minigames.bonus_stage import bonus_stage
 from idle_runner.minigames.boss import boss_fight_knight, boss_fight_victor
 from idle_runner.minigames.ascending_heights import ascending_heights
@@ -23,6 +24,7 @@ EXPECTED_SIZE = (1280, 720)
 WINDOW_RETRY_MS = 2000  # how often to look for the game window again after it is gone
 BOX_RETRY_MS = 15_000  # buy again this soon after a Random Box stopped a buy
 SIX_COIN_TIMEOUT_MS = 120_000  # buy anyway if the counter stays unreadable this long after reading < 6
+MINIONS_EVERY_MS = 30 * 60_000  # missions take 3 h or more (wiki); also after each tree run
 MAX_CONSECUTIVE_CRASHES = 5  # unexpected errors in a row before giving up (e.g. the game window is gone)
 
 
@@ -42,7 +44,9 @@ class Runner:
         self.shop = Shop(game)
         self.tree = Tree(game, settings.tree_order)
         self.tree_due = settings.auto_buy_tree  # once at start: the user may have ascended by hand
+        self.minions_due = True  # once at start too: the node may have been bought by hand
         now = game.now()
+        self.timer_minions = now
         self.last_slow = now
         self.timer_buy = now
         self.timer_ascend = now
@@ -144,8 +148,6 @@ class Runner:
             self._routine("claim_quests", self.shop.claim_quests)
         if soul_bonus_active(g):  # rage during soul bonus
             g.tap("r")
-        if g.pixel_is(99, 113, 0xFFFF7A):  # minions are back
-            self._routine("collect_minions", lambda: collect_minions(g))
         if g.pixel_is(187, 296, 0xFFBB31) and g.pixel_is(187, 303, 0xF68F37):  # chest hunt
             self._routine("chest_hunt", lambda: chest_hunt(
                 g, s.no_lockpicking, s.perfect_chest_hunt, s.no_reinforced_crystal_saver))
@@ -199,6 +201,11 @@ class Runner:
             if s.auto_buy_tree and self.tree_due:  # not in the original (2026-10-26)
                 self.tree_due = False
                 self._routine("buy_tree", self.tree.buy)
+                self.minions_due = True  # it may have just bought a minion
+            if self.minions_due or g.now() - self.timer_minions > MINIONS_EVERY_MS:
+                self.minions_due = False
+                self.timer_minions = g.now()
+                self._routine("send_minions", lambda: send_minions(g))
 
     def buy(self) -> None:
         """AutoUpgrade; if a Random Box stopped it or the shop didn't open, buy again in BOX_RETRY_MS

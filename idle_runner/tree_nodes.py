@@ -40,8 +40,8 @@ NODES: dict[str, Node] = {
     "Orange Ore": Node((267, 227), 5),
     "Yellow Ore": Node((348, 227), 5),
     "Dangerous While Alone": Node((118, 242), 35),
-    # 3. The tier list, tiers 1-10 in the wiki's order (Map: not located yet; Bullet Time located 2026-10-26,
-    #    first here as the old comment listed it).
+    # 3. The tier list, tiers 1-10 in the wiki's order (Bullet Time located 2026-10-26, first here as the old
+    #    comment listed it; Map located 2026-10-28, in the "top" layout).
     "Bullet Time": Node((243, 304), 250),
     "Doesn't Matter to Me": Node((307, 303), 150),
     "Soul Slash": Node((247, 363), 450),
@@ -61,6 +61,7 @@ NODES: dict[str, Node] = {
     "Enchanted Arrows": Node((308, 363), 600),
     "Dark Wand": Node((248, 452), 2_000),
     "Dark Wizard": Node((276, 454), 2_500),
+    "Map": Node((77, 172), 150, "top"),
     "Ethereal Wand": Node((219, 452), 500),
     "Dual Randomness": Node((218, 393), 300),
     "Coins In The Box": Node((217, 422), 350),
@@ -144,7 +145,8 @@ RECOMMENDED_ORDER: tuple[str, ...] = tuple(NODES)
 # Surveyed 2026-10-26 (every unknown node at minimum zoom, and the band the header covers, in the "top" layout;
 # Santi's tree, most of these bought): not in the recommended order, whose wiki source didn't place them, but
 # they can be added to tree_order (the Tree order page lists them). Costs as the game shows them; a bought node
-# showed "Unlocked | N". Not located yet: Map, Land Lord, Astral Sword, Astral Blessing, Daily Silver Bonus.
+# showed "Unlocked | N". Not located yet: Land Lord, Astral Sword, Astral Blessing and Daily Silver Bonus, Astral
+# upgrades that only show once Astral Slayer (500 M SP) is bought (wiki, Ultra Ascension page).
 NODES |= {
     "Magic Beetle Box": Node((537, 364), 30_000_000_000),
     "Cheap Cooldown": Node((243, 242), 25),

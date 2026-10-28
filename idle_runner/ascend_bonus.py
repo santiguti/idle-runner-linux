@@ -47,6 +47,35 @@ def read_ascend_bonus(game: Game) -> float | None:
     return float(match[1]) if match else None
 
 
+def sp_amount(mask: np.ndarray, pixels: np.ndarray) -> int | None:
+    """A plain SP amount drawn as `mask` ("21,048", same font as the bonus), ending at the SP icon beside it
+    (found by its 6A31CA in `pixels`, the band's colours). None for anything else: a suffixed amount ("1.5 M"),
+    an unknown glyph, no icon. Used for the Minions tab's "N available" and mission costs (2026-10-28)."""
+    icon = (pixels == (0x6A, 0x31, 0xCA)).all(axis=2)
+    columns = mask.any(axis=0)
+    text, x = "", 0
+    while x < len(columns):
+        if not columns[x]:
+            x += 1
+            continue
+        start = x
+        while x < len(columns) and columns[x]:
+            x += 1
+        if icon[:, start:x].any():
+            return int(text.replace(",", "")) if re.fullmatch(r"\d{1,3}(?:,\d{3})*", text) else None
+        glyph = mask[:, start:x]
+        rows = np.nonzero(glyph.any(axis=1))[0]
+        glyph = glyph[rows.min():rows.max() + 1]
+        if glyph.shape[0] <= 7 and glyph.shape[1] <= 5:  # the thousands comma (a decimal point fails the check)
+            text += ","
+            continue
+        label = _classify(glyph)
+        if label is None or not label.isdigit():
+            return None
+        text += label
+    return None
+
+
 def _lines(white: np.ndarray) -> list[np.ndarray]:
     rows = white.any(axis=1)
     lines, y = [], 0

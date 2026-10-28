@@ -30,11 +30,11 @@ It only **looks at the game window and presses keys**, the same way you would. I
 | | |
 |---|---|
 | 🏃 **Runs** | Jumps and boosts nonstop, at the rate you choose. |
-| 🎁 **Collects** | Silver and orange boxes, minions and the daily bonus. |
+| 🎁 **Collects** | Silver and orange boxes, and two extra Daily Quests every day. Sends your minions on their missions. |
 | 🛒 **Buys** | Upgrades and equipment every few minutes, and claims quest rewards. Right after an ascension it buys as soon as you have 6 coins, then slows down gradually. |
 | 🌀 **Travels** | Takes portals, cycling through the zones if you want. |
 | 😡 **Rages** | Uses rage at Megahordes, optionally only with Soul Bonus. |
-| 🎮 **Plays minigames** | Chest hunts, bonus stages, Ascending Heights and the Victor boss fight. |
+| 🎮 **Plays minigames** | Chest hunts, Bonus Stages 2 and 3, Ascending Heights and the Victor boss fight. |
 | ⬆️ **Ascends** | Optional. On a timer, or as soon as the Ascend button's **"+X% CpS bonus"** reaches the percentage you set. |
 | 🌳 **Spends SP** | Optional. Buys Ascension Tree nodes in your order, at start and after every ascension. *New, still being tested.* |
 
@@ -149,11 +149,12 @@ The first time the bot presses a key, KDE Plasma on Wayland asks whether to allo
 - Clicks outside the game window are refused.
 - **Shop:** every tab click is checked before buying, so a click meant for one tab can't land on another (e.g. "Max" in Equipment is "Buy all available" in Upgrades). If the shop doesn't open (e.g. a minigame's results screen still covers it), it tries again 15 s later. The shop is closed only while it shows, and the bot waits for it to finish closing: a second click while it closes leaves an empty panel that blocks every later click.
 - **Quests:** blue event-quest rows are skipped while their button is the grey "Quest Reward", and bought once claimed. Without a Quests tab (after an Ultra Ascension, until quests are unlocked again) it doesn't claim, so it never opens the Jewels shop by mistake.
-- **Random Box:** if a silver or orange box shows up while shopping, the bot stops, lets the jumper grab it and buys again shortly after.
+- **Random Box:** if a silver or orange box shows up while shopping or claiming quests, the bot stops, lets the jumper grab it and buys again shortly after.
 - **After an ascension:** the coin counter is read, and the bot buys as soon as it shows 6 coins (the sword's first level), by the bot's ascension or yours. Then buying restarts at `post_ascend_first_buy_seconds` (default 15 s) and the wait doubles up to `auto_buy_minutes`.
 - **Ascend by %:** every `ascend_bonus_sample_minutes` the bot opens the Ascension tab and reads the button's "+X% CpS bonus" (SP gained by ascending ÷ SP earned so far). With `auto_ascend_percent` set, it ascends at the first reading that reaches it; `auto_ascend_minutes` stays as the cap. A bonus it can't read is logged with a screenshot, never guessed.
 - **Ascension Tree:** with `auto_buy_tree`, the bot zooms the tree all the way out (where every node has a fixed place), then clicks the nodes in the order of `tree_order` (see Settings). Bought nodes are skipped; it stops at the first node it can't buy. It runs at start, after each ascension by the bot, and after one by hand. Restart the bot after an Ultra Ascension by hand.
-- **Minions:** claimed only when the Minions tab really shows, so the claim clicks never land in the tree.
+- **Minions:** at start, after each tree run and every 30 minutes the bot claims the minions back from their missions and sends every minion whose mission your unspent SP covers. It reads the mission's cost on the button and your SP in the header first, so the game never gets to offer jewels for the rest.
+- **Bonus Stage 1** (while the tree's "Bonus Stage 2" node isn't bought) is skipped: the bot lets its first section run out and closes it.
 - One-shot crafts (Dimensional/Bidimensional staff) apply once per run. The portal rotation restarts from `circle_portals_count`.
 - Bonus-stage sync markers that never show up are logged as `Sync timeout` events with a screenshot.
 - The Knight boss fight is disabled.

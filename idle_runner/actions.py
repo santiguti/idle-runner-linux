@@ -79,36 +79,3 @@ def open_ascension_tab(game: Game) -> bool:
         if game.find_until(260, 480, 260, 480, 0x58188D, timeout_ms=2000):  # Ascend button
             return True
     return False
-
-
-def collect_minions(game: Game) -> None:
-    if not open_ascension_tab(game):
-        game.click(570, 694)  # exit
-        return
-    game.click(193, 680)  # ascension tree tab
-    game.sleep(200)
-    game.click(691, 680)  # unlabelled in the original
-    game.sleep(200)
-    game.click(332, 680)  # minions tab
-    game.sleep(200)
-    # Not in the original: after an Ultra Ascension there is no Minions tab until the node is bought again,
-    # yet the trigger fired (2026-10-26) and the claim clicks below landed in the Ascension Tree.
-    if game.pixel_search(332, 676, 332, 676, TAB_SELECTED, variation=6) is None:
-        event("Minions tab not shown")
-        game.click(570, 694)  # exit
-        return
-    if game.pixel_search(370, 410, 910, 470, 0x11AA23, variation=9):  # daily bonus available
-        game.click(320, 280, clicks=5)  # claim all
-        game.sleep(200)
-        game.click(320, 280, clicks=5)  # send all
-        game.sleep(200)
-        game.click(320, 180, clicks=5)  # claim the daily bonus
-        game.sleep(200)
-        event("Minions Collect with Daily Bonus")
-    else:
-        game.click(318, 182, clicks=5)  # claim all
-        game.sleep(200)
-        game.click(318, 182, clicks=5)  # send all
-        game.sleep(200)
-        event("Minions Collect")
-    game.click(570, 694)  # exit

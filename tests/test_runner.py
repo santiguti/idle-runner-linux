@@ -108,15 +108,15 @@ def test_auto_ascend_when_the_sampled_bonus_reaches_its_percent(game, fake, jump
 
 
 def test_focus_loss_mid_routine_aborts_without_more_input(game, fake, jumper, event_names) -> None:
-    fake.paint(99, 113, 0xFFFF7A)  # minions are back
-
     def lose_focus(action: tuple) -> None:
         if action[0] == "click":
             fake.active = False
 
     fake.on_action = lose_focus
+    runner = Runner(game, Settings(), jumper)
+    fake.t += 6_000  # the first slow check sends minions: its first click opens the ascension panel
     with pytest.raises(GameUnavailable):
-        Runner(game, Settings(), jumper).tick()
+        runner.tick()
 
     assert fake.clicks() == [(95, 90)]
     assert "routine_abort" in event_names()
@@ -324,14 +324,13 @@ def test_game_unavailable_is_logged_once_and_resumed_when_it_clears(game, fake, 
 
 
 def test_pause_after_game_unavailable_is_not_reported_as_resumed(game, fake, jumper, event_names) -> None:
-    fake.paint(99, 113, 0xFFFF7A)  # minions are back
-
+    # The first slow check (5 s in) sends minions: its first click opens the ascension panel.
     def lose_focus(action: tuple) -> None:
         if action[0] == "click":
             fake.active = False
 
     fake.on_action = lose_focus
-    fake.stop_at = 3_000
+    fake.stop_at = 8_000
     Runner(game, Settings(), jumper).run()
 
     names = event_names()
@@ -523,3 +522,42 @@ def test_the_main_loop_never_clicks_second_wind(game, fake, jumper) -> None:
     runner.tick()
 
     assert (560, 600) not in fake.clicks()
+
+
+def test_minions_are_sent_at_the_first_slow_check_after_each_tree_run_and_every_30_minutes(
+        game, fake, jumper, monkeypatch) -> None:
+    sent: list[float] = []
+    monkeypatch.setattr(runner_module, "send_minions", lambda g: sent.append(fake.t))
+    runner = Runner(game, replace(Settings(), auto_buy_tree=False), jumper)
+    fake.t += 6_000
+    runner.tick()  # the first slow check: the node may have been bought by hand
+    fake.t += 6_000
+    runner.tick()
+    assert len(sent) == 1
+
+    runner.tree_due = True
+    runner.s = replace(runner.s, auto_buy_tree=True)
+    monkeypatch.setattr(runner.tree, "buy", lambda: None)
+    fake.t += 6_000
+    runner.tick()  # the tree may have just bought a minion
+    assert len(sent) == 2
+
+    fake.t += 30 * 60_000
+    runner.tick()
+    assert len(sent) == 3
+
+
+def test_the_ascension_button_glow_starts_no_minion_routine(game, fake, jumper, monkeypatch) -> None:
+    # The original's "minions are back" (99, 113) is the Ascension button's glow on this version: it glows
+    # while ascending is "Recommended" and fired with no minions at all (2026-10-28 00:15:03).
+    sent: list[float] = []
+    monkeypatch.setattr(runner_module, "send_minions", lambda g: sent.append(fake.t))
+    runner = Runner(game, Settings(), jumper)
+    fake.t += 6_000
+    runner.tick()
+    fake.paint(99, 113, 0xFFFF7A)
+    for _ in range(3):
+        fake.t += 1_000
+        runner.tick()
+
+    assert len(sent) == 1
