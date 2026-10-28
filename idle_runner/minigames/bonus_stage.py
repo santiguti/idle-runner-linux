@@ -22,6 +22,7 @@ class Bs2Section:
     fail_check_before_collect: bool
     collect_hold: tuple[int, int] | None  # cSend() before the collection taps
     collect_taps: int                     # Send("{Up}") + Sleep(500), repeated
+    sync_also: tuple[int, int, int] | None = None  # a pixel (x, y, color) the sync also waits for
 
 
 # The original waits for the first stone block's light edge at the single pixel (220, 465). That
@@ -29,7 +30,13 @@ class Bs2Section:
 # in two runs on 2026-10-23 (204-223 on 2026-10-22), so it timed out. This is the span the original
 # itself uses for the same block in section 3.
 S1_SYNC = (151, 465, 220, 465, 0xCFBCB8)
-S2_SYNC = (780, 513, 780, 513, 0xBB26DF)
+# The original waits for the magenta slimes (780, 513) BB26DF. They cover the second of section 2's two opening pits
+# only once the tree's "Protect" node is bought (wiki; the bot bought it on 2026-10-28 at 17:14 and every BS2
+# before had none, so section 2 never started). The slimes sit 13 px right of the pit's left edge (9 of 9 frames,
+# 2026-10-28), so the sync now waits for that edge, (767, 631) turning pit-black 151515, while the first pit, 357 px
+# to its left, shows at (508, 631): when the first pit's own edge passes (767, 631), the ground is there.
+S2_SYNC = (767, 631, 767, 631, 0x151515)
+S2_SYNC_ALSO = (508, 631, 0x151515)
 S3_SYNC = (151, 465, 220, 465, 0xCFBCB8)
 S4_SYNC = (250, 472, 100, 250, 0x0D2030)
 
@@ -44,7 +51,7 @@ BS2_SECTIONS = (
         (94, 1640), (32, 1218), (94, 600), (109, 1828), (63, 640), (47, 688), (78, 1906),
         (141, 1625), (47, 3187), (47, 734), (47, 750), (78, 1203), (110, 5000),
     ), True, (40, 5000), 17),
-    Bs2Section(S2_SYNC, 0, S2_MOVES, True, (350, 1000), 20),
+    Bs2Section(S2_SYNC, 0, S2_MOVES, True, (350, 1000), 20, S2_SYNC_ALSO),
     Bs2Section(S3_SYNC, 0,
                ((109, 1203), (31, 641), (47, 1578), (47, 2437)) * 3 + ((109, 1203), (31, 641), (47, 5125)),
                True, (900, 200), 20),
@@ -59,7 +66,7 @@ BS2_SB_SECTIONS = (
     Bs2Section(S1_SYNC, 200,
                ((94, 1640), (47, 2072), (187, 688), (31, 672), (31, 1700)) * 2 + ((94, 5000),),
                True, (40, 2500), 19),
-    Bs2Section(S2_SYNC, 0, S2_MOVES, True, (350, 1000), 20),
+    Bs2Section(S2_SYNC, 0, S2_MOVES, True, (350, 1000), 20, S2_SYNC_ALSO),
     Bs2Section(S3_SYNC, 0,
                ((109, 1203), (31, 641), (47, 1200), (1, 3100)) * 3 + ((109, 1203), (31, 641), (47, 5125)),
                True, (900, 200), 20),
@@ -132,6 +139,9 @@ def bonus_stage(game: Game, skip: bool) -> int:
         else:
             run_bs2(game, spirit_boost)
     game.save_frame("bonus-stage-end")
+    # The reward run, "Bonus Stage Completed!" and the fade outlast the last section by about 14 s (live 2026-10-28
+    # 20:17: every shop and ascension click made meanwhile failed). The shop button's grey shows the run is back.
+    game.find_until(1130, 604, 1130, 604, 0x989898, timeout_ms=30_000)
     return stage
 
 
@@ -178,7 +188,7 @@ def bs2_section(game: Game, section: Bs2Section, label: str) -> bool:
     def failed() -> bool:
         return game.pixel_is(716, 600, 0xAF0000)
 
-    game.find_until(*section.sync, label=label)  # the original carries on regardless
+    game.find_until(*section.sync, label=label, also=section.sync_also)  # the original carries on regardless
     game.sleep(section.sync_sleep)
     holds(game, section.moves)
     if section.fail_check_before_collect and failed():

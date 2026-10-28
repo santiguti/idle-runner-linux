@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.1 (2026-10-28)
+
+### Fixed
+- **Minions back from a mission went unclaimed with four or more minions.** The Minions list only shows two or three whole rows, and the bot only looked at those: a "Claim Reward" lower in the list (cut off by the tabs) was never seen. The bot now scrolls the whole list, top to bottom, waiting for it to stop bouncing at its ends before it reads a button.
+- **Bonus Stage 2 got stuck in its second section without the "Protect" node.** The bot started that section when the purple slimes reached a spot, but the slimes only cover the pits once "Protect" is bought: without it the character ran into a wall until the time ran out. The bot now times the section by the pits themselves, which gives the same moment with or without the node.
+- **Failed clicks right after every Bonus Stage.** The stage goes on for about 14 seconds after its last section (the reward run, "Bonus Stage Completed!"); the bot already tried to shop and check the ascension bonus meanwhile, and both failed. It now waits for the normal run first.
+
 ## v2.2.0 (2026-10-28)
 
 **Idle Runner and the bot now speak Spanish**: the window in English or Spanish, and the game played in either language.

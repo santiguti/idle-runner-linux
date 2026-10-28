@@ -9,9 +9,10 @@ button's glow (it glows while ascending is "Recommended"), not minions coming ba
 from idle_runner.actions import TAB_SELECTED, open_ascension_tab
 from idle_runner.ascend_bonus import sp_amount
 from idle_runner.config import Settings
-from idle_runner.game import Game
+from idle_runner.game import Game, Point
 from idle_runner.game_settings import _bands
 from idle_runner.log import event
+from idle_runner.shop import SCROLLBAR_TRACK_1254
 
 SEND = (0x54, 0x17, 0x87)           # "Send on Mission (-N SP)"
 AWAY = (0x97, 0x5D, 0xCA)           # "On a Mission..."
@@ -24,7 +25,14 @@ HEADER_DIGITS = (0xA6, 0x75, 0xFE)  # the header's "N available"
 BUTTON_LEFT, BUTTON_RIGHT = 410, 436
 LIST_TOP, LIST_BOTTOM = 136, 659    # the list between the header and the tab bar (client y 105-628)
 BUTTON_HEIGHT = 120                 # a whole button shows 123 px of its colour (client y 222-344)
-MAX_CLICKS = 10
+MAX_STEPS = 20                      # clicks and page turns: five minions need up to 10 clicks and 2 turns
+# The list's scrollbar at client x 606 (2026-10-28, five minions): track A0A0A0, thumb BFBFBF, client y 111-625.
+# With two or three minions there is no scrollbar.
+SCROLLBAR_TOP, SCROLLBAR_BOTTOM = (614, 143), (614, 656)
+SCROLL_THUMB = 0xBFBFBF
+# A page down: the list (523 px) minus a button (123 px) is 400 px, so every button is whole on some page.
+PAGE_NOTCHES = 7                    # 350 px, 50 px a notch
+LIST_POINTER = (100, 431)           # over the portraits: no control there
 # Mission minutes by cost in SP, which is fixed per minion (wiki, Minions): White Knight, Dark Wizard, Skeleton,
 # Goo Mutant, Stone Golem. The Ninja and the Cyclops cost "50 B" and "100 B", which never read.
 MISSION_MINUTES = {10: 180, 150: 390, 1_000: 180, 1_500: 270, 3_000: 1_380}
@@ -88,6 +96,31 @@ def send_buttons(game: Game, color: tuple[int, int, int] = SEND) -> list[int]:
     return tops
 
 
+def thumb(game: Game) -> tuple[Point | None, Point | None]:
+    """The scrollbar thumb's ends, or (None, None) without a scrollbar."""
+    return (game.pixel_search(*SCROLLBAR_TOP, *SCROLLBAR_BOTTOM, SCROLL_THUMB),
+            game.pixel_search(*SCROLLBAR_BOTTOM, *SCROLLBAR_TOP, SCROLL_THUMB))  # bottom-up
+
+
+def scroll(game: Game, up: bool, notches: int) -> bool:
+    """Wheel the list and wait until it stands still; False if it didn't move. Past either end the list
+    stretches and springs back for up to 0.45 s (live 2026-10-28), and buttons read meanwhile are moving:
+    20 notches up at the top stretched it so far that 7 down 33 ms later never moved the thumb's top."""
+    before = thumb(game)
+    game.wheel(up=up, notches=notches)
+    deadline = game.now() + 2000  # the game sometimes stops drawing for over a second
+    while thumb(game) == before:
+        if game.now() > deadline:
+            return False
+        game.sleep(10)
+    last, still_since = thumb(game), game.now()
+    while game.now() - still_since < 100 and game.now() < deadline + 2000:
+        game.sleep(10)
+        if (now := thumb(game)) != last:
+            last, still_since = now, game.now()
+    return True
+
+
 def minions_shown(game: Game) -> bool:
     """Wait up to 2 s for the Minions tab: its shade and a button of a known colour. The shade fades in (200 ms
     after the click it still hadn't when the tree had just switched tabs, live 2026-10-28 02:43), and alone it
@@ -106,8 +139,9 @@ def send_minions(game: Game) -> list[int]:
     covers. Claims cost nothing; each send is checked against the header's SP:
     without enough, the game may offer to pay the rest with jewels (the tree did, 2026-10-26). The list
     moves when a minion leaves (the Daily Bonus banner above it changes), so the buttons are found again
-    after each send. Only the buttons on screen are seen: the list holds two whole ones, enough for the
-    White Knight and the Dark Wizard (the Daily Bonus isn't taken yet). Returns the costs of the missions sent."""
+    after each send. The list holds two or three whole buttons, so it is read from its top a page at a time
+    (five minions on 2026-10-28: a claim cut off by the tab bar was never seen). Returns the costs of the
+    missions sent."""
     sent: list[int] = []
     if not open_ascension_tab(game):
         game.click(570, 694)  # exit
@@ -126,7 +160,11 @@ def send_minions(game: Game) -> list[int]:
             game.save_frame("minions-buttons-unknown")
         game.click(570, 694)  # exit
         return sent
-    for _ in range(MAX_CLICKS):
+    game.move(*LIST_POINTER)
+    if thumb(game)[0]:
+        scroll(game, up=True, notches=10)  # to the top: the list scrolls about 4.5 notches
+    noted: set[int | None] = set()  # costs already logged as not sent: pages overlap
+    for _ in range(MAX_STEPS):
         claims = send_buttons(game, CLAIM)
         if claims:
             game.click(522, claims[0] + 62)  # the button's middle
@@ -149,12 +187,19 @@ def send_minions(game: Game) -> list[int]:
         affordable = [(top, cost) for top, cost in costs if cost is not None and cost <= available]
         if not affordable:
             for top, cost in costs:
+                if cost in noted:
+                    continue
+                noted.add(cost)
                 if cost is None:
                     event("Minion not sent", reason="cost not readable")
                     game.save_frame("minion-cost-unreadable")
                 else:
                     event("Minion not sent", reason="not enough SP", cost=cost, available=available)
-            break
+            # A page down, unless the thumb already reaches the track's bottom end (or there is no scrollbar).
+            if not (game.pixel_is(*SCROLLBAR_BOTTOM, SCROLLBAR_TRACK_1254)
+                    and scroll(game, up=False, notches=PAGE_NOTCHES)):
+                break
+            continue
         top, cost = affordable[0]
         game.click(522, top + 62)  # the button's middle
         deadline = game.now() + 2000

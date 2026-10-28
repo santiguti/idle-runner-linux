@@ -62,6 +62,23 @@ def test_skip_bonus_stage_waits_for_the_fail_screen(game, fake, event_names) -> 
     assert "Do nothing BonusStage Active" in names and "BonusStage2 Failed" in names
 
 
+def test_bonus_stage_returns_once_the_run_is_back(game, fake) -> None:
+    # Live 2026-10-28 20:17: the reward run, "Bonus Stage Completed!" and the fade lasted 14 s after the last
+    # section, and the shop and ascension clicks made meanwhile all failed. The shop button's grey tells the run.
+    fake.paint(716, 600, 0xAF0000)
+    grab = fake.grab
+
+    def run_back_at_10_s(x: int, y: int, w: int, h: int):
+        if fake.t >= 10_000:
+            fake.paint(1130, 604, 0x989898)
+        return grab(x, y, w, h)
+
+    fake.grab = run_back_at_10_s
+    bonus_stage(game, skip=True)
+
+    assert fake.t >= 10_000
+
+
 def test_bs3_sync_timeouts_are_logged(game, events) -> None:
     bs3_section1(game, False)
 
@@ -79,7 +96,7 @@ def test_skipped_bonus_stage_saves_the_end_frame(game, fake, events) -> None:
 def test_bs2_takes_second_wind_and_reruns_the_failed_section(game, fake, event_names) -> None:
     fake.paint(716, 600, 0xAF0000)  # fail screen: Close button...
     fake.paint(615, 590, 0x00A400)  # ...and the Second Wind button
-    for x, y, color in ((220, 465, 0xCFBCB8), (780, 513, 0xBB26DF), (200, 400, 0x0D2030)):
+    for x, y, color in ((220, 465, 0xCFBCB8), (767, 631, 0x151515), (508, 631, 0x151515), (200, 400, 0x0D2030)):
         fake.paint(x, y, color)  # every section's sync marker, so the test doesn't wait out timeouts
 
     def second_wind(action: tuple) -> None:
@@ -111,6 +128,22 @@ def test_bs2_first_sync_finds_the_block_wherever_it_stops(game, fake, event_name
     bs2_section(game, BS2_SECTIONS[0], "BonusStage2-s1")
 
     assert "Sync timeout" not in event_names()
+
+
+@pytest.mark.parametrize(("name", "synced"), [
+    # Section 2 opens with two pits 357 px apart. Without the tree's "Protect" node they're open (2026-10-28 14:21,
+    # before the bot bought it at 17:14); with it slimes cover the second one, 13 px right of its edge, where the
+    # original synced. Santi's run of 20:33 had them.
+    ("s2-first-pit", False),  # the first pit at the sync column, ground left of it
+    ("s2-second-pit", True),
+    ("s2-second-pit-protect", True),
+])
+def test_bs2_second_sync_waits_for_the_second_pit_with_or_without_protect(
+        game, fake, event_names, name: str, synced: bool) -> None:
+    fake.frame[:] = read_png(FIXTURES / f"{name}.png")
+    bs2_section(game, BS2_SECTIONS[1], "BonusStage2-s2")
+
+    assert ("Sync timeout" not in event_names()) is synced
 
 
 @pytest.mark.parametrize(("name", "showing"), [

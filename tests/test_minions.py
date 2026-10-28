@@ -262,6 +262,60 @@ def test_reads_the_cost_with_the_game_in_spanish(game, fake) -> None:
     assert read_available_sp(game) == 149_022
 
 
+def five_minions(fake, start: str = "claim-cut-765038") -> list[tuple[int, int]]:
+    """Five minions, more than the list shows (2026-10-28): at its top (black box 20:18) Skeleton, White Knight
+    and Goo Mutant are on a mission and the Dark Wizard's "Claim Reward" is cut off by the tab bar; scrolled to its
+    bottom (20:37) the claim is whole, with the Stone Golem under it. Returns the clicks on that claim."""
+    claims: list[tuple[int, int]] = []
+
+    def act(action: tuple) -> None:
+        if action[0] == "click":
+            click = (action[1] + OFFSET[0], action[2] + OFFSET[1])
+            if click == (95, 90):
+                fake.paint(538, 681, 0xAD1111)
+                fake.paint(260, 480, 0x58188D)
+            elif click == (332, 680):
+                show_panel(fake, start)
+                # The tab pulses gold while a claim waits (20:18 caught it gold); the pulse's dark end is the
+                # selected shade (20:37).
+                fake.paint(332, 676, 0x5E261B)
+            elif in_button(click, 372) and fake.frame[372 - 31, 430][1] == 0xA6:
+                claims.append(click)
+                fake.paint(410, 372, 0x975DCA, w=29, h=123)
+        elif action == ("button", 5, True):  # wheel down
+            show_panel(fake, "claim-bottom-765038")
+        elif action == ("button", 4, True):  # wheel up
+            show_panel(fake, "claim-cut-765038")
+
+    fake.on_action = act
+    return claims
+
+
+def test_scrolls_down_to_a_claim_the_list_cut_off(game, fake, event_names) -> None:
+    # Live 2026-10-28 20:18 and 20:19: the bot looked at the list's top twice and never saw the Dark Wizard's claim.
+    claims = five_minions(fake)
+    send_minions(game)
+
+    assert len(claims) == 1
+    assert "Minion claimed" in event_names()
+
+
+def test_scrolls_to_the_top_first(game, fake) -> None:
+    # The game keeps the list where it was left: at 20:37 it was at the bottom, Skeleton out of sight.
+    five_minions(fake, start="claim-bottom-765038")
+    send_minions(game)
+
+    wheel = [a[1] for a in fake.actions if a[0] == "button" and a[1] in (4, 5) and a[2]]
+    assert wheel[0] == 4  # up
+
+
+def test_a_short_list_is_not_scrolled_down(game, fake, monkeypatch) -> None:
+    play_minions_tab(fake, monkeypatch, available=526)
+    send_minions(game)
+
+    assert ("button", 5, True) not in fake.actions
+
+
 def test_a_lost_minions_tab_click_is_retried(game, fake, monkeypatch, event_names) -> None:
     # Live 2026-10-28 19:25: the panel was already on the Minions tab; the Ascension tab click switched the list
     # away at once but its shade stayed on Minions, and the Minions click 24 ms later was lost. The shade said

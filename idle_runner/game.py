@@ -124,15 +124,19 @@ class Game:
         return self.pixel_search(x, y, x, y, color) is not None
 
     def find_until(self, left: int, top: int, right: int, bottom: int, color: int,
-                   timeout_ms: float = 15_000, label: str | None = None) -> Point | None:
+                   timeout_ms: float = 15_000, label: str | None = None,
+                   also: tuple[int, int, int] | None = None) -> Point | None:
         """FindPixelUntilFound from Common.au3: poll until the colour shows up or time runs out.
 
         With a `label`, a timeout is logged as a "Sync timeout" event plus a frame: minigames use
         it for the markers they synchronize on, so a missed sync is visible without DEBUG logs.
+        `also` is a pixel (x, y, colour) that must show at the same time.
         """
         start = self.now()
         while self.now() - start <= timeout_ms:
             found = self._search(left, top, right, bottom, color, 0)
+            if found and also and not self._search(also[0], also[1], also[0], also[1], also[2], 0):
+                found = None
             if found:
                 log.debug("find_until 0x%06X found at %s after %.0f ms", color, found, self.now() - start)
                 return found
