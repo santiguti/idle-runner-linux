@@ -4,7 +4,9 @@
 
 ### New
 - **Two extra Daily Quests every day.** Once a day, after the reset at 00:00 UTC, the bot presses the free "+2" button beside the Daily Quests header.
-- **Minions are sent on their missions.** The game gives each minion its own "Send on Mission" button now, so the old "claim all / send all" clicks did nothing. The bot claims them back and sends every minion your unspent SP covers at start, after each tree run and every 30 minutes, reading the cost and your SP first so the game never offers jewels.
+- **Minions are sent on their missions.** The game gives each minion its own "Send on Mission" button now, so the old "claim all / send all" clicks did nothing. The bot claims them back and sends every minion your unspent SP covers at start, after each tree run and when a mission ends, reading the cost and your SP first so the game never offers jewels.
+- **The game's settings are checked at start.** The bot opens Settings, reads the options it needs (custom cursor, portal dialogue, rounded bulk, hidden locked quest rewards, scientific notation), presses Cancel and lists any wrong one as a problem. It never clicks anything else in that dialog.
+- **Minion missions are timed.** The bot knows how long each mission takes (the wiki's table) and comes back for the minion when it's over. Tick the Divinities that make missions faster on the new Minions panel of the Settings page.
 - **Map in the Ascension Tree.** The bot knows where Map is (150 SP), and it's in the recommended order after Dark Wizard. Land Lord, Astral Sword, Astral Blessing and Daily Silver Bonus are Astral upgrades: they only show once Astral Slayer is bought.
 
 ### Fixed

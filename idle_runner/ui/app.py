@@ -39,9 +39,10 @@ FILTERS = {"Everything": None, "Purchases": {"buy", "quest", "tree"}, "Ascension
 SETUP = """Before you start, in Idle Slayer:
 •  Windowed, 1280×720, in English.
 •  Keys: jump = Up arrow, boost = Right arrow.
-•  Custom cursor off, portal dialogue off.
+•  Custom cursor off, portal dialogue off, scientific notation off.
 •  Rounded bulk on, hide locked quest rewards on.
 •  Don't buy the Vertical Magnet.
+The bot reads these settings at start (then presses Cancel) and lists any wrong one under Problems.
 
 The bot only plays while the game window is in front. Click another window to pause it, click the game to
 resume."""

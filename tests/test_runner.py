@@ -114,11 +114,11 @@ def test_focus_loss_mid_routine_aborts_without_more_input(game, fake, jumper, ev
 
     fake.on_action = lose_focus
     runner = Runner(game, Settings(), jumper)
-    fake.t += 6_000  # the first slow check sends minions: its first click opens the ascension panel
+    fake.t += 6_000  # the first slow check reads the game settings: its first click opens the shop
     with pytest.raises(GameUnavailable):
         runner.tick()
 
-    assert fake.clicks() == [(95, 90)]
+    assert fake.clicks() == [(1163, 655)]
     assert "routine_abort" in event_names()
 
 
@@ -324,7 +324,7 @@ def test_game_unavailable_is_logged_once_and_resumed_when_it_clears(game, fake, 
 
 
 def test_pause_after_game_unavailable_is_not_reported_as_resumed(game, fake, jumper, event_names) -> None:
-    # The first slow check (5 s in) sends minions: its first click opens the ascension panel.
+    # The first slow check (5 s in) reads the game settings: its first click opens the shop.
     def lose_focus(action: tuple) -> None:
         if action[0] == "click":
             fake.active = False
@@ -577,3 +577,15 @@ def test_the_ascension_button_glow_starts_no_minion_routine(game, fake, jumper, 
         runner.tick()
 
     assert len(sent) == 1
+
+
+def test_the_game_settings_are_checked_once_at_start(game, fake, jumper, monkeypatch) -> None:
+    checks: list[float] = []
+    monkeypatch.setattr(runner_module, "check_game_settings", lambda g, shop: checks.append(fake.t))
+    monkeypatch.setattr(runner_module, "send_minions", lambda g: [])
+    runner = Runner(game, Settings(), jumper)
+    for _ in range(3):
+        fake.t += 6_000
+        runner.tick()
+
+    assert len(checks) == 1

@@ -91,6 +91,8 @@ def test_texts() -> None:
         ({"event": "Minion claimed"}, ("buy", "A minion came back from its mission")),
         ({"event": "Minion sent", "cost": 150}, ("buy", "Sent a minion (150 SP)")),
         ({"event": "Minions SP not readable"}, ("problem", "Minions SP not readable")),
+        ({"event": "Game setting wrong", "setting": "Rounded bulk buy", "should_be": "on"},
+         ("problem", "Game setting wrong: Rounded bulk buy")),
         ({"event": "Sync timeout", "where": "BonusStage2-s1", "timeout_ms": 15000},
          ("problem", "Sync timeout: BonusStage2-s1")),
         ({"event": "Tree node not bought", "node": "Village Key"}, ("problem", "Tree node not bought: Village Key")),

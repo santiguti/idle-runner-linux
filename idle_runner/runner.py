@@ -8,6 +8,7 @@ from idle_runner.actions import (BIDIMENSIONAL_STAFF, DIMENSIONAL_STAFF, RAGE_PI
 from idle_runner.coins import read_coins
 from idle_runner.config import Settings
 from idle_runner.game import Game
+from idle_runner.game_settings import check_game_settings
 from idle_runner.log import event, log
 from idle_runner.minigames.chest_hunt import chest_hunt
 from idle_runner.minions import mission_ms, send_minions
@@ -46,6 +47,7 @@ class Runner:
         self.tree = Tree(game, settings.tree_order)
         self.tree_due = settings.auto_buy_tree  # once at start: the user may have ascended by hand
         self.minions_due = True  # once at start too: the node may have been bought by hand
+        self.settings_due = True  # the in-game settings the bot needs, once at start
         now = game.now()
         self.timer_minions = now
         self.minions_back: list[float] = []  # when the missions the bot sent end
@@ -161,6 +163,9 @@ class Runner:
         if g.now() - self.last_slow >= 5000:
             self.last_slow = g.now()
             close_all(g)
+            if self.settings_due:  # not in the original, which only listed them
+                self.settings_due = False
+                self._routine("check_game_settings", lambda: check_game_settings(g, self.shop))
             if g.pixel_is(660, 254, 0xFFE737) and g.pixel_is(638, 236, 0xFFBB31):  # bonus stage
                 self._routine("bonus_stage", lambda: bonus_stage(g, s.skip_bonus_stage))
             if (g.pixel_is(639, 224, 0xFF878A) and g.pixel_is(634, 224, 0xF263BD)

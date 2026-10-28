@@ -18,7 +18,7 @@ MINIGAMES = {
     "Start of Ascending Heights": "Ascending Heights",
 }
 # Shown as problems when they carry one of these fields: "Sync timeout: BonusStage2-s1".
-DETAIL_FIELDS = ("where", "node", "reason")
+DETAIL_FIELDS = ("where", "node", "reason", "setting")
 
 
 @dataclass

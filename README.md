@@ -70,9 +70,11 @@ python3 -m venv .venv
 **2. Set up the game:**
 - Windowed, **1280x720**, in **English**.
 - Keybinds: jump = **Up arrow**, boost = **Right arrow**.
-- Disable the custom cursor and the portal dialogue.
+- Disable the custom cursor, the portal dialogue and scientific notation.
 - Enable *rounded bulk* and *hide locked quest rewards*.
 - Don't buy the **Vertical Magnet**.
+
+At start the bot opens the game's Settings, reads these options (it only reads them, then presses Cancel) and lists any that are wrong on the Activity page.
 
 **3. Start it:** `idle-runner` (or `.venv/bin/python -m idle_runner`) opens the window.
 
@@ -153,7 +155,7 @@ The first time the bot presses a key, KDE Plasma on Wayland asks whether to allo
 - **After an ascension:** the coin counter is read, and the bot buys as soon as it shows 6 coins (the sword's first level), by the bot's ascension or yours. Then buying restarts at `post_ascend_first_buy_seconds` (default 15 s) and the wait doubles up to `auto_buy_minutes`.
 - **Ascend by %:** every `ascend_bonus_sample_minutes` the bot opens the Ascension tab and reads the button's "+X% CpS bonus" (SP gained by ascending ÷ SP earned so far). With `auto_ascend_percent` set, it ascends at the first reading that reaches it; `auto_ascend_minutes` stays as the cap. A bonus it can't read is logged with a screenshot, never guessed.
 - **Ascension Tree:** with `auto_buy_tree`, the bot zooms the tree all the way out (where every node has a fixed place), then clicks the nodes in the order of `tree_order` (see Settings). Bought nodes are skipped; it stops at the first node it can't buy. It runs at start, after each ascension by the bot, and after one by hand. Restart the bot after an Ultra Ascension by hand.
-- **Minions:** at start, after each tree run and every 30 minutes the bot claims the minions back from their missions and sends every minion whose mission your unspent SP covers. It reads the mission's cost on the button and your SP in the header first, so the game never gets to offer jewels for the rest.
+- **Minions:** at start, after each tree run and when a mission it started should be over, the bot claims the minions back from their missions and sends every minion whose mission your unspent SP covers. It knows each mission's length from its cost (the wiki's table); tick the Divinities that speed missions up (Work Benefits, Improved Work Conditions, Greeks Blessing) on the Settings page. Missions it didn't start are looked at every hour. It reads the mission's cost on the button and your SP in the header first, so the game never gets to offer jewels for the rest.
 - **Bonus Stage 1** (while the tree's "Bonus Stage 2" node isn't bought) is skipped: the bot lets its first section run out and closes it.
 - One-shot crafts (Dimensional/Bidimensional staff) apply once per run. The portal rotation restarts from `circle_portals_count`.
 - Bonus-stage sync markers that never show up are logged as `Sync timeout` events with a screenshot.
