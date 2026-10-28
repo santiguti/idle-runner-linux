@@ -21,13 +21,14 @@ class Settings:
     circle_portals: bool = False
     circle_portals_count: int = 7
     disable_rage_without_soul_bonus: bool = False
-    auto_buy_upgrades: bool = False
-    auto_buy_minutes: float = 10
-    auto_ascend: bool = False
-    auto_ascend_minutes: float = 10
-    auto_ascend_percent: float = 0
+    # A new install shops and ascends (Santi, 2026-10-28); the original had both off, every 10 minutes.
+    auto_buy_upgrades: bool = True
+    auto_buy_minutes: float = 3
+    auto_ascend: bool = True
+    auto_ascend_minutes: float = 30
+    auto_ascend_percent: float = 20
     post_ascend_first_buy_seconds: int = 15
-    ascend_bonus_sample_minutes: float = 0
+    ascend_bonus_sample_minutes: float = 2.5
     auto_buy_tree: bool = False
     # [tree]
     tree_order: tuple[str, ...] = RECOMMENDED_ORDER
@@ -118,8 +119,6 @@ def check_ranges(path: Path, s: Settings) -> None:
         problems.append("ascend_bonus_sample_minutes must be >= 0")
     if s.auto_ascend_percent < 0:
         problems.append("auto_ascend_percent must be >= 0")
-    if s.auto_ascend_percent and not s.ascend_bonus_sample_minutes:
-        problems.append("auto_ascend_percent needs ascend_bonus_sample_minutes > 0 (that's when it is read)")
     if s.post_ascend_first_buy_seconds < 0:
         problems.append("post_ascend_first_buy_seconds must be >= 0")
     if not 0 <= s.color_tolerance <= 255:

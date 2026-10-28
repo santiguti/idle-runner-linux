@@ -18,7 +18,7 @@ def test_every_field_names_a_card() -> None:
 @pytest.mark.parametrize("key", [k for k, f in FIELDS.items() if f.minimum is not None or f.maximum is not None])
 def test_field_limits_pass_check_ranges(key: str) -> None:
     kind = {f.name: f.type for f in fields(Settings)}[key]
-    base = Settings(ascend_bonus_sample_minutes=5)  # ascending at a bonus needs the bonus checked
+    base = Settings()
     for limit in (FIELDS[key].minimum, FIELDS[key].maximum):
         if limit is not None:
             check_ranges(Path("x"), replace(base, **{key: kind(limit)}))  # no ValueError

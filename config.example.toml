@@ -16,16 +16,16 @@ circle_portals = false                   # take the next portal destination when
 circle_portals_count = 7                 # first destination: 1 hills, 2 hot desert, 3 jungle, 4 frozen fields,
                                          # 5 funky, 6 modern city, 7 factory, 8 valley, 9 castle
 disable_rage_without_soul_bonus = false  # don't rage at Megahordes unless Soul Bonus is active
-auto_buy_upgrades = false                # buy upgrades and equipment every auto_buy_minutes
-auto_buy_minutes = 10                    # how often to buy, once auto_buy_upgrades is on
-auto_ascend = false                      # ascend every auto_ascend_minutes or at auto_ascend_percent
+auto_buy_upgrades = true                 # buy upgrades and equipment every auto_buy_minutes
+auto_buy_minutes = 3                     # how often to buy, once auto_buy_upgrades is on
+auto_ascend = true                       # ascend every auto_ascend_minutes or at auto_ascend_percent
                                          # (irreversible)
-auto_ascend_minutes = 10                 # how often to ascend, once auto_ascend is on
-auto_ascend_percent = 0                  # also ascend as soon as the Ascend button shows at least this
+auto_ascend_minutes = 30                 # how often to ascend, once auto_ascend is on
+auto_ascend_percent = 20                 # also ascend as soon as the Ascend button shows at least this
                                          # "+X% CpS bonus" (read every ascend_bonus_sample_minutes; 0 = off)
 post_ascend_first_buy_seconds = 15       # after ascending, buy this soon, then double the wait up to
                                          # auto_buy_minutes (0 = original behaviour)
-ascend_bonus_sample_minutes = 0          # read the Ascend button's "+X% CpS bonus" this often and log it
+ascend_bonus_sample_minutes = 2.5        # read the Ascend button's "+X% CpS bonus" this often and log it
                                          # (0 = off)
 auto_buy_tree = false                    # buy Ascension Tree nodes (spends SP) in the order of tree_order:
                                          # at start and after each ascension

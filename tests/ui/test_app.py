@@ -57,10 +57,10 @@ def test_the_dashboard_follows_the_events(window, tmp_path) -> None:
 
 def test_saving_a_setting_writes_the_config(window, tmp_path) -> None:
     app = window()
-    app.settings_page.vars["auto_buy_minutes"].set("3")
+    app.settings_page.vars["auto_buy_minutes"].set("4")
 
     assert app.settings_page.save()
-    assert "auto_buy_minutes = 3.0" in (tmp_path / "config.toml").read_text(encoding="utf-8")
+    assert "auto_buy_minutes = 4.0" in (tmp_path / "config.toml").read_text(encoding="utf-8")
 
 
 def test_an_invalid_value_is_shown_and_not_saved(window, tmp_path) -> None:

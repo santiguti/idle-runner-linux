@@ -4,13 +4,13 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <img alt="Linux and Windows (beta)" src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20(beta)-orange">
+  <img alt="Linux and Windows" src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-brightgreen">
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab">
 </p>
 
 # Idle Runner
 
-**An Idle Slayer bot for Linux and Windows** (Windows is in beta). It plays [Idle Slayer](https://store.steampowered.com/app/1353300/Idle_Slayer/) for you. It jumps, collects boxes, buys upgrades, plays the minigames, ascends when it's worth it and spends your Slayer Points on the Ascension Tree.
+**An Idle Slayer bot for Linux and Windows.** It plays [Idle Slayer](https://store.steampowered.com/app/1353300/Idle_Slayer/) for you. It jumps, collects boxes, buys upgrades, plays the minigames, ascends when it's worth it and spends your Slayer Points on the Ascension Tree.
 
 It only **looks at the game window and presses keys**, the same way you would. It never touches the game's memory, files or saves.
 
@@ -35,7 +35,7 @@ It only **looks at the game window and presses keys**, the same way you would. I
 | 🌀 **Travels** | Takes portals, cycling through the zones if you want. |
 | 😡 **Rages** | Uses rage at Megahordes, optionally only with Soul Bonus. |
 | 🎮 **Plays minigames** | Chest hunts, Bonus Stages 2 and 3, Ascending Heights and the Victor boss fight. |
-| ⬆️ **Ascends** | Optional. On a timer, or as soon as the Ascend button's **"+X% CpS bonus"** reaches the percentage you set. |
+| ⬆️ **Ascends** | As soon as the Ascend button's **"+X% CpS bonus"** reaches 20%, or every 30 minutes at the latest. You can change both, or turn it off. |
 | 🌳 **Spends SP** | Optional. Buys Ascension Tree nodes in your order, at start and after every ascension. *New, still being tested.* |
 
 ## 🔒 Safety
@@ -43,7 +43,7 @@ It only **looks at the game window and presses keys**, the same way you would. I
 - It only reads pixels from the game window and sends keys and mouse clicks. It never reads or changes the game's memory, files or network traffic.
 - It never spends jewels (they cost real money): it presses Buy in the Ascension Tree only when the game shows enough Slayer Points, and closes any jewel offer.
 - It never Ultra Ascends.
-- Ascending and tree buying are off until you turn them on.
+- Tree buying is off until you turn it on. Ascending is on from the start (at a +20% CpS bonus, at the latest every 30 minutes); turn it off on the Settings page if you'd rather ascend yourself.
 
 ## 📦 Install
 
@@ -89,8 +89,6 @@ Press **Start**, then click on the game. The bot only plays while the game windo
 <details>
 <summary>Windows</summary>
 
-The Windows version is tested automatically, but it's still a beta until more people run it with the real game. Please [report how it goes](../../issues/new/choose).
-
 Download `IdleRunner-…-windows-x64.zip` from [Releases](../../releases), unzip it anywhere and double-click `IdleRunner.exe`. The exe isn't code-signed, so SmartScreen may say "Windows protected your PC": choose **More info → Run anyway**.
 
 Or run it from source in PowerShell (Python 3.12 or newer):
@@ -106,7 +104,7 @@ py -m venv .venv
 </details>
 
 > [!WARNING]
-> **Auto-ascend and tree buying are off by default, and neither can be undone.** Ascending resets your run, and tree nodes spend your SP. Turn them on only if you want the bot to do it for you.
+> **The bot ascends on its own from the start** (at a +20% CpS bonus, or after 30 minutes), and an ascension can't be undone: it resets your run. Turn *Ascend automatically* off on the Settings page if you'd rather do it yourself. Tree buying, which spends your SP, stays off until you turn it on.
 
 <details>
 <summary>The game boots to a black screen?</summary>

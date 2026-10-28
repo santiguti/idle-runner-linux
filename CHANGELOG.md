@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## v2.0.0 (2026-10-28)
+
+**Windows is out of beta**: the same bot, tested with the real game on Windows and on Linux. Download the Windows zip or the Linux `tar.gz` below; no Python needed. Changes since v2.0.0-rc2:
 
 ### New
+- **Settings that play from the start.** A new install buys every 3 minutes and ascends at a +20% CpS bonus (read every 2.5 minutes) or after 30 minutes; before, buying and ascending were off, as in the original. Settings you already saved don't change. Tree buying stays off.
 - **Two extra Daily Quests every day.** Once a day, after the reset at 00:00 UTC, the bot presses the free "+2" button beside the Daily Quests header.
 - **Minions are sent on their missions.** The game gives each minion its own "Send on Mission" button now, so the old "claim all / send all" clicks did nothing. The bot claims them back and sends every minion your unspent SP covers at start, after each tree run and when a mission ends, reading the cost and your SP first so the game never offers jewels.
 - **The game's settings are checked at start.** The bot opens Settings, reads the options it needs (custom cursor, portal dialogue, rounded bulk, hidden locked quest rewards, scientific notation), presses Cancel and lists any wrong one as a problem. It never clicks anything else in that dialog.
@@ -13,6 +16,7 @@
 - **Ascending by % stopped reading the bonus once it got high.** From about +50% the game tags the Ascend button "Recommended" and paints the numbers gold; the bot only read white, so it never ascended until the time cap. It reads the gold numbers now.
 - **A Random Box was lost while claiming quests.** The bot stopped shopping for a box, but not claiming: it now closes the shop for the box there too, and claims again later.
 - **Minions ran on a false signal.** The bot took the Ascension button's glow (it glows while ascending is "Recommended") for minions coming back, opened the panel for nothing and could click into it. That signal is gone.
+- **The update notice never showed on test versions.** The window couldn't read a version like "2.0.0-rc2", so the rc builds never said a newer release was out. It does now; if you have rc1 or rc2, download this one by hand.
 - **Bonus Stage 1 is skipped.** Left to the jumper it never collected an orb (its jumps fall short of the orbs), and buys paused it in the middle of the stage. The bot now lets its first section run out and closes the stage, as the original does with every stage but 2 and 3.
 
 ## v2.0.0-rc2 (2026-10-27)

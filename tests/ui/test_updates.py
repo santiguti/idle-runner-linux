@@ -18,6 +18,14 @@ def test_a_dev_build_is_older_than_its_release() -> None:
     assert not newer("2.0.0", "v2.0.0.dev0")
 
 
+def test_a_release_candidate_is_older_than_its_release() -> None:
+    # The rc1/rc2 builds couldn't read their own "2.0.0-rc2", so they never saw a newer release (2026-10-28).
+    assert newer("2.0.0-rc2", "v2.0.0")
+    assert newer("2.0.0-rc2", "v2.0.0-rc3")
+    assert newer("2.0.0.dev0", "v2.0.0-rc1")
+    assert not newer("2.0.0", "v2.0.0-rc3")
+
+
 def test_unparsable_tags_are_not_newer() -> None:
     assert not newer("2.0.0", "garbage")
     assert not newer("garbage", "v2.0.0")

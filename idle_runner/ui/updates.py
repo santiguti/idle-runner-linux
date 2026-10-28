@@ -5,15 +5,17 @@ import urllib.request
 
 from idle_runner import REPO
 
-_VERSION = re.compile(r"v?(\d+)\.(\d+)\.(\d+)(?:\.dev(\d+))?")
+_VERSION = re.compile(r"v?(\d+)\.(\d+)\.(\d+)(?:\.dev(\d+)|-rc(\d+))?")
 
 
-def _key(version: str) -> tuple[int, int, int, int] | None:
+def _key(version: str) -> tuple[int, int, int, int, int] | None:
+    """Sortable: 2.0.0.dev0 < 2.0.0-rc1 < 2.0.0-rc2 < 2.0.0."""
     found = _VERSION.fullmatch(version.strip())
     if not found:
         return None
-    major, minor, patch, dev = found.groups()
-    return int(major), int(minor), int(patch), 0 if dev is not None else 1  # 2.0.0.dev0 < 2.0.0
+    major, minor, patch, dev, rc = found.groups()
+    stage, number = (0, dev) if dev is not None else (1, rc) if rc is not None else (2, 0)
+    return int(major), int(minor), int(patch), stage, int(number)
 
 
 def newer(current: str, latest_tag: str) -> bool:

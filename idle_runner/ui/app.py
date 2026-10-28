@@ -50,7 +50,8 @@ SAFETY = """What the bot will never do:
 •  Read or change the game's memory, files or network. It only looks at the window and presses keys.
 •  Spend jewels. It presses Buy in the tree only when the game shows enough Slayer Points.
 •  Ultra Ascend.
-Ascending and tree buying stay off until you turn them on."""
+Tree buying stays off until you turn it on. Ascending is on: at a +20% CpS bonus, at the latest every
+30 minutes (Settings, Ascending)."""
 
 
 class BotProcess:

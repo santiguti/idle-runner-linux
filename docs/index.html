@@ -168,7 +168,7 @@
     <p class="lede">An Idle Slayer bot for Linux and Windows. It plays for you while you're AFK, by looking at the screen and pressing keys.</p>
     <div class="download">
       <a class="btn" id="primary" href="https://github.com/santiguti/idle-slayer-bot/releases">Download for Linux</a>
-      <a class="alt" id="secondary" href="https://github.com/santiguti/idle-slayer-bot/releases">or for Windows (beta)</a>
+      <a class="alt" id="secondary" href="https://github.com/santiguti/idle-slayer-bot/releases">or for Windows</a>
     </div>
     <p class="fine" id="fine">Free and open source. For the Steam version of Idle Slayer.</p>
   </div>
@@ -192,7 +192,7 @@
       <div><dt>Travels</dt><dd>Takes portals, cycling through the zones if you want.</dd></div>
       <div><dt>Rages</dt><dd>Uses rage at Megahordes, optionally only with Soul Bonus.</dd></div>
       <div><dt>Plays minigames</dt><dd>Chest hunts, Bonus Stages 2 and 3, Ascending Heights and the Victor boss fight.</dd></div>
-      <div><dt>Ascends, if you want</dt><dd>On a timer, or when the "+X% CpS bonus" reaches the percentage you set.</dd></div>
+      <div><dt>Ascends</dt><dd>When the "+X% CpS bonus" reaches 20%, or every 30 minutes at the latest. You can change both, or turn it off.</dd></div>
       <div><dt>Spends SP, if you want</dt><dd>Buys Ascension Tree nodes in your order after every ascension.</dd></div>
     </dl>
 
@@ -215,7 +215,7 @@
         <li>Read or change the game's memory, files, saves or network traffic. It only sees pixels and sends keys and clicks.</li>
         <li>Spend jewels. They cost real money, so it closes every jewel offer.</li>
         <li>Ultra Ascend.</li>
-        <li>Ascend or spend your Slayer Points unless you turn that on.</li>
+        <li>Spend your Slayer Points on the Ascension Tree unless you turn that on.</li>
       </ul>
     </div>
   </section>
@@ -244,7 +244,7 @@
         <p class="note">Ubuntu 22.04, Fedora 36 or newer, with the Steam version of the game for Linux.</p>
       </div>
       <div>
-        <h3>Windows (beta)</h3>
+        <h3>Windows</h3>
         <ol>
           <li>Download the <code>windows-x64.zip</code> and unzip it.</li>
           <li>Double-click <code>IdleRunner.exe</code> and press Start.</li>
@@ -269,7 +269,7 @@
   const primary = document.getElementById("primary");
   const secondary = document.getElementById("secondary");
   if (windows) {
-    primary.textContent = "Download for Windows (beta)";
+    primary.textContent = "Download for Windows";
     secondary.textContent = "or for Linux";
   }
   fetch("https://api.github.com/repos/santiguti/idle-slayer-bot/releases?per_page=10")

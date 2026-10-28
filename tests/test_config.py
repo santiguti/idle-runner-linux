@@ -18,9 +18,18 @@ def write(tmp_path: Path, text: str) -> Path:
 def test_defaults_match_the_original(tmp_path) -> None:
     s = load_settings(write(tmp_path, ""))
     assert s.jump_interval_ms == 150
-    assert s.auto_buy_minutes == 10 and s.auto_ascend_minutes == 10
     assert s.no_lockpicking is True
     assert s.circle_portals_count == 7
+
+
+def test_a_new_install_shops_and_ascends(tmp_path) -> None:
+    # Santi, 2026-10-28, after trying the Windows download as a new user: the original's defaults (no buying,
+    # no ascending) left the bot doing almost nothing.
+    s = load_settings(write(tmp_path, ""))
+    assert s.auto_buy_upgrades and s.auto_buy_minutes == 3 and s.post_ascend_first_buy_seconds == 15
+    assert s.auto_ascend and s.auto_ascend_minutes == 30 and s.auto_ascend_percent == 20
+    assert s.ascend_bonus_sample_minutes == 2.5  # the % is only seen when it's read
+    assert not s.auto_buy_tree
 
 
 def test_sections_are_flattened(tmp_path) -> None:
@@ -46,11 +55,11 @@ def test_out_of_range_is_an_error(tmp_path) -> None:
         load_settings(write(tmp_path, "[general]\njump_interval_ms = 301\n"))
 
 
-def test_ascend_percent_needs_bonus_samples(tmp_path) -> None:
-    with pytest.raises(ValueError, match="auto_ascend_percent needs ascend_bonus_sample_minutes > 0"):
-        load_settings(write(tmp_path, "[general]\nauto_ascend_percent = 10\n"))
-    s = load_settings(write(tmp_path, "[general]\nauto_ascend_percent = 10\nascend_bonus_sample_minutes = 1\n"))
-    assert s.auto_ascend_percent == 10
+def test_ascend_percent_without_bonus_samples_is_allowed(tmp_path) -> None:
+    # "Check the bonus every 0" turns ascending at a bonus off, as the Settings page says: the bonus is never
+    # read. With the default 20 % it was an error the moment someone set the checks to 0.
+    s = load_settings(write(tmp_path, "[general]\nauto_ascend_percent = 10\nascend_bonus_sample_minutes = 0\n"))
+    assert s.auto_ascend_percent == 10 and s.ascend_bonus_sample_minutes == 0
 
 
 def test_tree_buying_is_off_by_default(tmp_path) -> None:

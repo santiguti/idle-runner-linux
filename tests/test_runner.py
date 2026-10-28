@@ -221,7 +221,7 @@ def test_post_ascend_ramp_can_be_disabled(game, fake, jumper, monkeypatch) -> No
     fake.t += 61_000
     runner.tick()
 
-    assert runner.buy_minutes == 10
+    assert runner.buy_minutes == settings.auto_buy_minutes
 
 
 def test_wrong_window_size_pauses_input_and_warns(jumper, event_names, logs) -> None:
