@@ -38,6 +38,15 @@ def test_sections_are_flattened(tmp_path) -> None:
     assert s.auto_buy_minutes == 2.5
 
 
+def test_the_old_frame_offset_is_ignored(tmp_path) -> None:
+    # The offset (8, 31) only converts the original's coordinates to the game's picture, the same on every PC.
+    # It was a setting until 2026-10-28, when a saved 30 silently broke single-pixel checks; old files keep it.
+    s = load_settings(write(tmp_path, "[game]\noffset_x = 8\noffset_y = 30\n"))
+
+    assert not hasattr(s, "offset_y")
+    assert "offset" not in dump_settings(s)
+
+
 def test_unknown_key_is_an_error(tmp_path) -> None:
     with pytest.raises(ValueError, match="unknown setting 'auto_bu_upgrades'"):
         load_settings(write(tmp_path, "[general]\nauto_bu_upgrades = true\n"))

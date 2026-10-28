@@ -86,9 +86,6 @@ FIELDS: dict[str, Field] = {
                                        "Crafting", "toggle"),
     # Advanced
     "window_name": Field("Game window title", "", "Advanced", "text"),
-    "offset_x": Field("Frame offset X", "Between the original's coordinates and the game's picture.", "Advanced",
-                      "int", "px"),
-    "offset_y": Field("Frame offset Y", "", "Advanced", "int", "px"),
     "color_tolerance": Field("Colour tolerance", "0 matches colours exactly, like the original.", "Advanced",
                              "int", "", 0, 255),
     "log_dir": Field("Logs folder", "Logs, screenshots and the black box.", "Advanced", "text"),

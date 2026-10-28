@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.1.2 (2026-10-28)
+
+### Fixed
+- **Silver boxes went unclaimed.** The bot waited for one exact shade of the button's glow, which it could miss for many minutes. It now accepts the middle of the glow.
+- **False chest hunts.** A coin flying past the spot the bot watches could start a "chest hunt" in the middle of the run: about 6 minutes of clicks on empty sky, with no buying or claiming meanwhile. The bot now also looks for the first chest's dark outline, which coins don't have.
+
+### Removed
+- **The "Frame offset X/Y" settings.** They only convert the original script's coordinates to the game's picture, so they're the same on every PC, and any other value quietly broke the bot (one pixel off is enough to never see the silver box). Saved settings that still have them load as before; the values are ignored.
+
+### Known issue
+- **Bonus Stage 2 stops at its second section.** With the current version of the game the bot doesn't find the start of section 2, so that section and the rest of the stage fail. Being worked on.
+
 ## v2.1.1 (2026-10-28)
 
 ### New

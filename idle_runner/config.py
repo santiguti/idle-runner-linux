@@ -13,8 +13,6 @@ from idle_runner.tree_nodes import NODES, RECOMMENDED_ORDER
 class Settings:
     # [game]
     window_name: str = "Idle Slayer"
-    offset_x: int = 8
-    offset_y: int = 31
     color_tolerance: int = 0
     # [general]
     jump_interval_ms: int = 150
@@ -56,7 +54,7 @@ class Settings:
 
 # Which [section] each setting goes in, in the order of config.example.toml.
 SECTIONS: dict[str, tuple[str, ...]] = {
-    "game": ("window_name", "offset_x", "offset_y", "color_tolerance"),
+    "game": ("window_name", "color_tolerance"),
     "general": ("jump_interval_ms", "circle_portals", "circle_portals_count", "disable_rage_without_soul_bonus",
                 "auto_buy_upgrades", "auto_buy_minutes", "auto_ascend", "auto_ascend_minutes",
                 "auto_ascend_percent", "post_ascend_first_buy_seconds", "ascend_bonus_sample_minutes",
@@ -67,6 +65,11 @@ SECTIONS: dict[str, tuple[str, ...]] = {
     "crafting": ("craft_soul_bonus", "craft_rage_pill", "craft_dimensional_staff", "craft_bidimensional_staff"),
     "debug": ("log_dir", "log_level", "save_frames", "blackbox_fps", "blackbox_minutes"),
 }
+
+
+# Settings that no longer exist; config files written before then still carry them. The frame offset (until
+# 2026-10-28) is the same on every PC, (8, 31) in `Game`, and any other value silently broke pixel checks.
+RETIRED = {"offset_x", "offset_y"}
 
 
 def load_settings(path: Path) -> Settings:
@@ -82,6 +85,8 @@ def load_settings(path: Path) -> Settings:
         if section not in SECTIONS:
             raise ValueError(f"{path}: unknown section [{section}]")
         for key, value in entries.items():
+            if key in RETIRED:
+                continue
             # A key repeated in two sections is always in the wrong one at least once.
             if key in section_of and section_of[key] != section:
                 raise ValueError(f"{path}: '{key}' belongs in [{section_of[key]}], not [{section}]")

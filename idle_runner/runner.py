@@ -147,7 +147,9 @@ class Runner:
             self.paused_reason = None
 
         # --- fast checks ---
-        if g.pixel_is(650, 36, 0xCA9700):  # silver box
+        # Silver box. Its button pulses B78800 -> F8BB00 about once a second; the original's exact CA9700 is
+        # one of ~107 shades and never matched in 14 minutes on 2026-10-28. ±16 covers ~40% of each pulse.
+        if g.pixel_search(650, 36, 650, 36, 0xCA9700, variation=16):
             event("Silver Box Collected")
             g.click(644, 49)
         if g.pixel_is(385, 280, 0x140C1C):  # megahorde
@@ -158,7 +160,10 @@ class Runner:
             self._routine("claim_quests", self.shop.claim_quests)
         if soul_bonus_active(g):  # rage during soul bonus
             g.tap("r")
-        if g.pixel_is(187, 296, 0xFFBB31) and g.pixel_is(187, 303, 0xF68F37):  # chest hunt
+        # Chest hunt. Every coin has the original's two colours 7 px apart (a false start on 2026-10-28), so
+        # also ask for the first chest's dark outline at (180, 296), seen in all 62 recorded chest hunts.
+        if (g.pixel_is(187, 296, 0xFFBB31) and g.pixel_is(187, 303, 0xF68F37)
+                and g.pixel_is(180, 296, 0x151515)):
             self._routine("chest_hunt", lambda: chest_hunt(
                 g, s.no_lockpicking, s.perfect_chest_hunt, s.no_reinforced_crystal_saver))
 

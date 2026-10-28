@@ -97,8 +97,8 @@ def run_bot(config_path: Path, stop_on_eof: bool = False) -> int:
     log_dir = Path(settings.log_dir)
     setup_logging(log_dir, settings.log_level)
     backend = open_backend(settings.window_name)
-    game = Game(backend, (settings.offset_x, settings.offset_y), settings.color_tolerance,
-                log_dir / "frames" if settings.save_frames else None)
+    game = Game(backend, tolerance=settings.color_tolerance,
+                frames_dir=log_dir / "frames" if settings.save_frames else None)
     jumper = Repeater(game, ("Up", "Right"), settings.jump_interval_ms, "jumper")
     runner = Runner(game, settings, jumper, state_path(config_path))
     install_stop_signals()

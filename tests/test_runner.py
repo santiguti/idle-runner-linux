@@ -25,6 +25,17 @@ def test_silver_box_is_collected(game, fake, jumper, event_names) -> None:
     assert "Silver Box Collected" in event_names()
 
 
+def test_silver_box_matches_its_pulsing_button(game, fake, jumper) -> None:
+    runner = Runner(game, Settings(), jumper)
+    # Measured 2026-10-28 over 1,086 frames: the button pulses B78800 -> F8BB00 about once a second, about
+    # 107 shades; the exact CA9700 of the original was 0.46% of them and never matched in 14 minutes.
+    for color, expected in ((0xB78800, False), (0xC29100, True), (0xD9A400, True), (0xF8BB00, False)):
+        fake.paint(650, 36, color)
+        fake.actions.clear()
+        runner.tick()
+        assert ((644, 49) in fake.clicks()) is expected, hex(color)
+
+
 def test_unfocused_game_gets_no_input_and_pause_is_logged_once(game, fake, jumper, event_names) -> None:
     fake.paint(650, 36, 0xCA9700)
     fake.active = False
@@ -153,9 +164,22 @@ def test_chest_hunt_is_dispatched(game, fake, jumper, monkeypatch) -> None:
     monkeypatch.setattr(runner_module, "chest_hunt", lambda g, *flags: calls.append(flags))
     fake.paint(187, 296, 0xFFBB31)
     fake.paint(187, 303, 0xF68F37)
+    fake.paint(180, 296, 0x151515)
     Runner(game, Settings(), jumper).tick()
 
     assert calls == [(True, False, False)]
+
+
+def test_a_coin_on_the_chest_hunt_pixels_is_not_a_chest_hunt(game, fake, jumper, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(runner_module, "chest_hunt", lambda g, *flags: calls.append(flags))
+    # 2026-10-28 14:19: every coin has FFBB31 with F68F37 7 px below it, and one crossed (187, 296).
+    fake.paint(187, 296, 0xFFBB31)
+    fake.paint(187, 303, 0xF68F37)
+    fake.paint(180, 296, 0x81E1FF)  # sky
+    Runner(game, Settings(), jumper).tick()
+
+    assert calls == []
 
 
 def test_bonus_stage_is_dispatched_on_the_slow_tick(game, fake, jumper, monkeypatch) -> None:
