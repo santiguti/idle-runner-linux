@@ -119,14 +119,10 @@ def bonus_stage(game: Game, skip: bool) -> int:
     # The original retried while (775, 448) is white, but that pixel is 141416 with the dialog up on this
     # version (2026-10-22): retry while the green handle still shows instead.
     slide_until(game, "bonus_stage", lambda: not slider_showing(game))
-    if skip:
+    # Bonus Stage 1 is always skipped, as the original skips every stage but 2 and 3: left to the jumper it
+    # never got an orb (its blind jumps fall short of the orb arcs: 0/15 live on 2026-10-26 and 2026-10-28).
+    if skip or stage == 1:
         do_nothing(game, stage)
-    elif stage == 1:
-        # No moves for it (the original has none): the routine ends here, so the jumper plays it and the main
-        # loop takes its Second Wind (Runner.bs1_until). With BS2's moves it failed at once and went on for
-        # ~2.5 min after the stage had ended, with the jumper paused (live, 2026-10-26).
-        event("BonusStage detected", stage=1)
-        return 1
     else:
         game.sleep(3900)
         spirit_boost = game.pixel_is(454, 91, 0xE1E0E2)

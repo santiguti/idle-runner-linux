@@ -353,7 +353,10 @@ class Shop:
             event("Claim quests: nothing to claim")
             g.click(1244, 712)  # close the shop
             return
-        self.claim_in_shop()
+        try:
+            self.claim_in_shop()
+        except BoxOnScreen:  # the shop button keeps glowing: the claim runs again later
+            event("Shopping stopped for a Random Box")
         g.click(1244, 712)  # close the shop
 
     def quests_claimable(self, watch_ms: float = 600) -> bool:
@@ -379,7 +382,8 @@ class Shop:
         self.game.click(1222, 677)  # close the shop
 
     def claim_in_shop(self) -> None:
-        """With the shop open: the Quests tab, then every green claim button in it. Leaves the shop open."""
+        """With the shop open: the Quests tab, then every green claim button in it. Leaves the shop open.
+        Raises BoxOnScreen when a Random Box shows up (a silver one was lost to the claim loop on 2026-10-28)."""
         g = self.game
         if not self.select_tab("quests", 1000, 690, sleep_ms=50):
             return
@@ -392,6 +396,7 @@ class Shop:
         g.save_frame("claim-quests-start")  # not in the original: shows a claim it can't see (event quests)
         deadline = g.now() + STUCK_MS
         while True:
+            self.stop_for_box()
             found = g.pixel_search(1160, 270, 1160, 590, 0x11A622, variation=10)
             if found is None:
                 self.take_extra_dailies()

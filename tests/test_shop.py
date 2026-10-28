@@ -822,3 +822,18 @@ def test_a_buy_visits_the_quests_tab_once_a_daily_quests_day(game, fake, monkeyp
     shop.finish_visit()
 
     assert fake.clicks().count((1000, 690)) == 2
+
+
+def test_claim_quests_stops_for_a_floating_box(game, fake, event_names) -> None:
+    # 2026-10-28 00:24:09-12: a silver box hovered over the player for 3.5 s while the claim loop scrolled
+    # the Quests list, and was lost.
+    fake.paint(807, 145, 0xFFFFFF)  # the shop is open
+    show_tab(fake, "quests")
+    fake.paint(1000, 690, 0xED8C18)  # the Quests tab glows: something to claim
+    fake.paint(1160, 300, 0x11A622)
+    paint_box(fake)
+    Shop(game).claim_quests()
+
+    assert (1160, 300) not in fake.clicks()
+    assert "Shopping stopped for a Random Box" in event_names()
+    assert fake.clicks()[-1] == (1244, 712)  # closed the shop so the player can jump

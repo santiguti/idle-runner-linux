@@ -160,19 +160,10 @@ def test_the_stage_is_told_from_its_start_screen(game, fake, frame: str, stage: 
     assert stage_number(game) == stage
 
 
-def test_bonus_stage_1_is_left_to_the_jumper(game, fake, events) -> None:
-    # Played with BS2's moves it failed at once, and the routine went on for ~2.5 min after the stage had
-    # ended, holding Up in the normal run with the jumper paused (live, 2026-10-26).
-    fake.frame[:] = read_png(FIXTURES / "start-bs1.png")
-    fake.on_action = lambda a: fake.frame.fill(0) if a[0] == "click" else None  # the swipe takes
-
-    assert bonus_stage(game, skip=False) == 1
-    assert [r.get("stage") for r in events() if r["event"] == "BonusStage detected"] == [1]
-    assert not [a for a in fake.actions if a[0] == "key"]
-    assert fake.t < 2_000
-
-
-def test_skipped_bonus_stage_1_declines_second_wind(game, fake, event_names) -> None:
+@pytest.mark.parametrize("skip", [False, True])
+def test_bonus_stage_1_is_skipped_and_its_second_wind_declined(game, fake, event_names, skip: bool) -> None:
+    # Left to the jumper it never got an orb: its blind jumps fall short of the orb arcs (0/15 in every
+    # section, live 2026-10-26 and 2026-10-28), and buys paused it in the middle of the stage.
     fake.frame[:] = read_png(FIXTURES / "start-bs1.png")
 
     def fail_screen_after_the_swipe(action: tuple) -> None:
@@ -182,5 +173,5 @@ def test_skipped_bonus_stage_1_declines_second_wind(game, fake, event_names) -> 
             fake.paint(716, 600, 0xAF0000)  # Close
 
     fake.on_action = fail_screen_after_the_swipe
-    assert bonus_stage(game, skip=True) == 1
+    assert bonus_stage(game, skip=skip) == 1
     assert "BonusStage1 Failed" in event_names() and (560, 600) not in fake.clicks()
