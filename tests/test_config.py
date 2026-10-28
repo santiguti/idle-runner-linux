@@ -148,7 +148,7 @@ def test_tree_order_belongs_in_the_tree_section(tmp_path) -> None:
 
 def test_minion_divinities_are_off_by_default(tmp_path) -> None:
     path = tmp_path / "config.toml"
-    path.write_text("[minions]\nwork_benefits = true\n")
+    path.write_text("[minions]\nwork_benefits = true\n", encoding="utf-8")
     settings = load_settings(path)
 
     assert settings.work_benefits and not settings.improved_work_conditions and not settings.greeks_blessing
