@@ -32,7 +32,12 @@ SETTINGS: dict[str, tuple[tuple[tuple[int, int], ...], bool]] = {
 SETTINGS_LABELS = ((89, 558), (83, 535))
 OFF, ON = (0xF8, 0x33, 0x08), (0x1D, 0xD7, 0x00)
 APPLY_GREEN, CANCEL_RED = 0x00A400, 0xAF0000
-SCROLLS = (33, 6)  # notches to the first four settings, then to the portal's (client y 149-484 and 169-432)
+# The list differs between builds: the Windows one lacks "Portrait" and more, and is 285 px shorter above the
+# settings (2026-10-28), so fixed scrolls missed four of them there. It's read from its top a page at a time:
+# 300 px of the 432 the list shows, so every row is whole on some page. 12 pages pass the Linux list's end (~58
+# notches); the Linux settings are all read 42 notches down.
+PAGE_NOTCHES = 6
+MAX_PAGES = 12
 
 
 def _bands(white: np.ndarray) -> list[tuple[int, int]]:
@@ -126,10 +131,12 @@ def check_game_settings(game: Game, shop: Shop) -> bool:
     game.sleep(300)
     found: dict[str, bool] = {}
     game.move(916, 331)  # between the list and its scrollbar: no control there
-    for notches in SCROLLS:
-        game.wheel(up=False, notches=notches)
-        game.sleep(1000)
+    for _ in range(MAX_PAGES):
+        game.wheel(up=False, notches=PAGE_NOTCHES)
+        game.sleep(500)  # a notch is usually drawn within 30 ms
         found |= read_toggles(game)
+        if len(found) == len(SETTINGS):
+            break
     if len(found) < len(SETTINGS):
         game.save_frame("settings-not-found")
     _close(game)

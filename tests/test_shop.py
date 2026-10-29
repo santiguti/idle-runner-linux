@@ -792,6 +792,25 @@ def test_extra_daily_quests_are_clicked_once_a_day_even_when_the_button_stays(ga
     assert "Extra daily quests click had no effect" in event_names()
 
 
+def test_extra_daily_quests_darkened_under_the_pointer_is_still_there(game, fake, event_names) -> None:
+    # Live 2026-10-28 21:43: under the pointer the button turns 266E26 at once; it only goes later. A lost
+    # click leaves it darkened like that.
+    paint_daily_quests_header(fake, "plus-2")
+    fake.on_action = lambda a: fake.paint(1179, 466, 0x266E26, w=67, h=32) if a[0] == "click" else None
+    Shop(game).take_extra_dailies()
+
+    assert "Extra daily quests click had no effect" in event_names()
+
+
+def test_extra_daily_quests_at_the_list_top_are_taken(game, fake) -> None:
+    # Without event quests the Daily Quests header is the list's first row (Santi, 2026-10-28): the button
+    # sits right under the list's top edge (AutoIt y 156).
+    fake.paint(1179, 162, 0x379D37, w=67, h=32)
+    Shop(game).take_extra_dailies()
+
+    assert fake.clicks() == [(1188, 177)]
+
+
 def test_extra_daily_quests_button_cut_off_by_the_list_top_is_not_clicked(game, fake) -> None:
     # Only its bottom shows: 15 px under the first green pixel is the Reroll button of the first daily quest.
     paint_daily_quests_header(fake, "plus-2")

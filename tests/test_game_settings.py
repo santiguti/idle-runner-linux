@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import numpy as np
+
 from idle_runner.game_settings import check_game_settings, find_settings_button, read_toggles
 from idle_runner.shop import Shop
 from tests.fakes import OFFSET, read_png
@@ -10,6 +12,13 @@ FIXTURES = Path(__file__).parent / "fixtures" / "game_settings"
 MENU, TOP, AT33, AT39 = (read_png(FIXTURES / f"{name}.png") for name in ("menu", "top", "at33", "at39"))
 # The same with the game in Spanish (2026-10-28): "Ajustes", "Usar notación científica", ...
 ES_MENU, ES_TOP, ES_AT33, ES_AT39 = (read_png(FIXTURES / f"es-{name}.png") for name in ("menu", "top", "at33", "at39"))
+# The list's content (client x 365-900) from 1,200 px down (24 notches, the Accessibility section's "Key
+# Bindings" row) to "Vibration", on Linux: stitched from frames 6 notches apart (live, 2026-10-28 21:56).
+LIST = read_png(FIXTURES / "list.png")
+LINUX_LIST_AT = 1200
+# The Windows build's list is 285 px shorter above the settings (no "Portrait" and more; frames of
+# 2026-10-28 21:14): "Rounded bulk buy" at client y 111 after 33 notches, at 396 on Linux.
+WINDOWS_LIST_AT = LINUX_LIST_AT - 285
 
 
 def test_reads_the_toggles_on_screen(game, fake) -> None:
@@ -44,15 +53,31 @@ def test_finds_the_settings_button_by_its_label(game, fake) -> None:
     assert find_settings_button(game) == (930, 558)
 
 
-def play_settings(fake, at33=AT33, at39=AT39, menu=MENU, top=TOP) -> None:
+def show_list(fake, scrolled: int, list_at: int, content: np.ndarray) -> None:
+    """The dialog's list (client y 101-532) scrolled `scrolled` px down; `content` starts `list_at` px into it
+    (blank rows stand for the Screen and Audio sections above and for the end below)."""
+    rows = np.full((432, 536, 3), 0x13, np.uint8)
+    for y in range(432):
+        if 0 <= (row := scrolled + y - list_at) < len(content):
+            rows[y] = content[row]
+    fake.frame[101:533, 365:901] = rows
+
+
+def play_settings(fake, list_at: int = LINUX_LIST_AT, content: np.ndarray = LIST, pages: dict | None = None,
+                  menu=MENU, top=TOP) -> None:
     """The shop opens (its corner and tab bar), "⋮" shows the menu, Settings opens the dialog at its top,
-    each wheel notch moves it 50 px (only the two recorded positions are painted) and Cancel goes back."""
+    each wheel notch scrolls the list 50 px and Cancel goes back. `pages`: recorded frames shown at those
+    notch counts instead (each stands in for the page it was recorded near)."""
     notches = [0]
 
     def act(action: tuple) -> None:
         if action[0] == "button" and action[1:] == (5, True):
             notches[0] += 1
-            fake.frame[:] = at33 if notches[0] == 33 else at39 if notches[0] == 39 else top
+            fake.frame[:] = top
+            if pages and notches[0] in pages:
+                fake.frame[:] = pages[notches[0]]
+            else:
+                show_list(fake, 50 * notches[0], list_at, content)
         if action[0] != "click":
             return
         click = (action[1] + OFFSET[0], action[2] + OFFSET[1])
@@ -70,6 +95,10 @@ def play_settings(fake, at33=AT33, at39=AT39, menu=MENU, top=TOP) -> None:
     fake.on_action = act
 
 
+def wheel_notches(fake) -> int:
+    return fake.actions.count(("button", 5, True))
+
+
 def test_checks_the_settings_and_only_cancels(game, fake, events) -> None:
     play_settings(fake)
     assert check_game_settings(game, Shop(game))  # all found and right
@@ -81,19 +110,34 @@ def test_checks_the_settings_and_only_cancels(game, fake, events) -> None:
     assert fake.clicks()[-2:] == [(791, 631), (1244, 712)]  # Cancel, then the shop's X
 
 
+def test_reads_the_whole_list_a_page_at_a_time_and_stops_once_all_are_found(game, fake) -> None:
+    play_settings(fake)
+    assert check_game_settings(game, Shop(game))
+
+    assert wheel_notches(fake) == 42  # "Confirm dialogue..." shows 42 notches down; the list goes on to ~58
+
+
+def test_reads_the_shorter_windows_list(game, fake, events) -> None:
+    # 2026-10-28 on Windows: 33 and 39 notches (the Linux list's places) showed four of them cut off or
+    # scrolled past, and they were all reported "not found".
+    play_settings(fake, list_at=WINDOWS_LIST_AT)
+    assert check_game_settings(game, Shop(game))
+
+
 def test_checks_the_settings_with_the_game_in_spanish(game, fake, events) -> None:
-    play_settings(fake, ES_AT33, ES_AT39, ES_MENU, ES_TOP)
+    play_settings(fake, content=LIST[:0], pages={30: ES_AT33, 36: ES_AT39}, menu=ES_MENU, top=ES_TOP)
 
     assert check_game_settings(game, Shop(game))
     assert (428, 631) not in fake.clicks()  # never Aplicar
 
 
 def test_reports_a_wrong_setting(game, fake, events) -> None:
-    at33 = AT33.copy()
-    # Rounded bulk buy's row (label at client y 389-404) turned off: the red cross instead of the green tick.
-    at33[375:420, 365:440][(at33[375:420, 365:440] == (0x1D, 0xD7, 0x00)).all(axis=2)] = (0x39, 0x39, 0x39)
-    at33[380:415, 368:410] = (0xF8, 0x33, 0x08)
-    play_settings(fake, at33=at33)
+    content = LIST.copy()
+    # Rounded bulk buy's row (label at y 738-753 of the list) turned off: the red cross instead of the green tick.
+    toggle = content[724:769, 0:75]
+    toggle[(toggle == (0x1D, 0xD7, 0x00)).all(axis=2)] = (0x39, 0x39, 0x39)
+    content[729:764, 3:45] = (0xF8, 0x33, 0x08)
+    play_settings(fake, content=content)
     assert not check_game_settings(game, Shop(game))
 
     wrong = [r for r in events() if r["event"] == "Game setting wrong"]
@@ -102,7 +146,7 @@ def test_reports_a_wrong_setting(game, fake, events) -> None:
 
 def test_a_list_it_cannot_read_reports_every_setting_missing(game, fake, events) -> None:
     # E.g. the game in another language: no label matches.
-    play_settings(fake, at33=TOP, at39=TOP)
+    play_settings(fake, content=LIST[:0])
     assert not check_game_settings(game, Shop(game))
 
     missing = [r["setting"] for r in events() if r["event"] == "Game setting not found"]

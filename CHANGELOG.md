@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.3.0 (2026-10-28)
+
+### New
+- **Takes the minions' Daily Bonus.** Once a day the Minions tab shows a free "Daily Bonus" that takes 3 hours off every mission running. The bot clicks it after sending the minions, while at least one is on a mission, so the missions it just started are shortened too; then it claims the ones the bonus finished and sends them again.
+
+### Fixed
+- **Windows: four game settings reported "not found".** The game's settings list is shorter on Windows than on Linux (no "Portrait" and other phone options), so the bot scrolled past four of them. It now reads the list a page at a time from the top until it has found all five.
+- **Tree nodes under the header could be clicked in the wrong place.** For Map, Hot Desert, Ancient Quests and Portal Dominum the bot zooms the tree in, and the zoom follows the mouse pointer: if the game saw the pointer elsewhere at that moment (it happened once on Windows), the tree landed 126 px to the side and the bot clicked empty space, which stopped the tree run. The bot now measures where the tree landed and clicks there; if it can't tell, it stops without clicking.
+- **A lost click on the "+2" Daily Quests button counted as taken.** The button darkens as soon as the pointer is over it, and the bot took that for the button going away. It now waits for the button to disappear and reports the click as without effect otherwise.
+
 ## v2.2.1 (2026-10-28)
 
 ### Fixed

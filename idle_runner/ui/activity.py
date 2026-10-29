@@ -135,6 +135,8 @@ def describe(record: dict, session: Session | None = None) -> tuple[str, str] | 
         return "quest", t("Took 2 extra daily quests")
     if name == "Minion claimed":
         return "buy", t("A minion came back from its mission")
+    if name == "Minions daily bonus taken":
+        return "buy", t("Took the minions' Daily Bonus: 3 hours off every mission")
     if name == "Minion sent":
         return "buy", t("Sent a minion ({cost} SP)", cost=record.get("cost"))
     if name == "Minion not sent" and record.get("reason") == "not enough SP":

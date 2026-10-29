@@ -33,6 +33,11 @@ SCROLL_THUMB = 0xBFBFBF
 # A page down: the list (523 px) minus a button (123 px) is 400 px, so every button is whole on some page.
 PAGE_NOTCHES = 7                    # 350 px, 50 px a notch
 LIST_POINTER = (100, 431)           # over the portraits: no control there
+# The Daily Bonus banner above the list (live 2026-10-28, client y 108-210): free on PC, one click takes 3 hours
+# off every mission running ("3 hours forwarded!", the SP unchanged) and it's gone until the next day. It pulses
+# (red C0-FF, green 07-3A) with its blue always 7C.
+DAILY_BONUS = (328, 191)            # its middle
+DAILY_BONUS_MS = 3 * 60 * 60_000
 # Mission minutes by cost in SP, which is fixed per minion (wiki, Minions): White Knight, Dark Wizard, Skeleton,
 # Goo Mutant, Stone Golem. The Ninja and the Cyclops cost "50 B" and "100 B", which never read.
 MISSION_MINUTES = {10: 180, 150: 390, 1_000: 180, 1_500: 270, 3_000: 1_380}
@@ -96,6 +101,28 @@ def send_buttons(game: Game, color: tuple[int, int, int] = SEND) -> list[int]:
     return tops
 
 
+def daily_bonus_shown(game: Game) -> bool:
+    """The Daily Bonus banner shows: its left margin (client x 25, y 110-205) is all its pulsing magenta."""
+    column = game.grab(33, 141, 33, 236).reshape(-1, 3).astype(int)
+    return bool(((column[:, 2] == 0x7C) & (column[:, 0] >= 0xBF) & (column[:, 1] <= 0x40)).all())
+
+
+def take_daily_bonus(game: Game) -> bool:
+    """Click the Daily Bonus banner if it shows; True once it's gone."""
+    if not daily_bonus_shown(game):
+        return False
+    game.click(*DAILY_BONUS)
+    deadline = game.now() + 2000  # gone within 100 ms live
+    while daily_bonus_shown(game):
+        if game.now() > deadline:
+            event("Minions daily bonus click had no effect")
+            game.save_frame("minions-daily-bonus-no-effect")
+            return False
+        game.sleep(50)
+    event("Minions daily bonus taken")
+    return True
+
+
 def thumb(game: Game) -> tuple[Point | None, Point | None]:
     """The scrollbar thumb's ends, or (None, None) without a scrollbar."""
     return (game.pixel_search(*SCROLLBAR_TOP, *SCROLLBAR_BOTTOM, SCROLL_THUMB),
@@ -134,18 +161,19 @@ def minions_shown(game: Game) -> bool:
     return False
 
 
-def send_minions(game: Game) -> list[int]:
+def send_minions(game: Game) -> tuple[list[int], bool]:
     """Claim the minions back from their missions, then send every minion whose mission the unspent SP
     covers. Claims cost nothing; each send is checked against the header's SP:
     without enough, the game may offer to pay the rest with jewels (the tree did, 2026-10-26). The list
     moves when a minion leaves (the Daily Bonus banner above it changes), so the buttons are found again
     after each send. The list holds two or three whole buttons, so it is read from its top a page at a time
-    (five minions on 2026-10-28: a claim cut off by the tab bar was never seen). Returns the costs of the
-    missions sent."""
+    (five minions on 2026-10-28: a claim cut off by the tab bar was never seen). Last the Daily Bonus, while a
+    minion is away: after the sends, so their new missions are shortened too. Returns the costs of the
+    missions sent and whether the Daily Bonus was taken (after them: they end 3 hours sooner)."""
     sent: list[int] = []
     if not open_ascension_tab(game):
         game.click(570, 694)  # exit
-        return sent
+        return sent, False
     for attempt in range(2):
         if attempt:
             event("Shop click retried", target="minions")
@@ -159,11 +187,12 @@ def send_minions(game: Game) -> list[int]:
             event("Minions buttons unknown")
             game.save_frame("minions-buttons-unknown")
         game.click(570, 694)  # exit
-        return sent
+        return sent, False
     game.move(*LIST_POINTER)
     if thumb(game)[0]:
         scroll(game, up=True, notches=10)  # to the top: the list scrolls about 4.5 notches
     noted: set[int | None] = set()  # costs already logged as not sent: pages overlap
+    away, bonus = False, False  # a minion on a mission seen; the Daily Bonus taken
     for _ in range(MAX_STEPS):
         claims = send_buttons(game, CLAIM)
         if claims:
@@ -174,7 +203,7 @@ def send_minions(game: Game) -> list[int]:
                     event("Minion not claimed")
                     game.save_frame("minion-claim-no-effect")
                     game.click(570, 694)  # exit
-                    return sent
+                    return sent, False
                 game.sleep(50)
             event("Minion claimed")
             continue
@@ -183,6 +212,7 @@ def send_minions(game: Game) -> list[int]:
             event("Minions SP not readable")
             game.save_frame("minions-sp-unreadable")
             break
+        away = away or bool(send_buttons(game, AWAY))
         costs = [(top, read_mission_cost(game, top)) for top in send_buttons(game)]
         affordable = [(top, cost) for top, cost in costs if cost is not None and cost <= available]
         if not affordable:
@@ -198,6 +228,7 @@ def send_minions(game: Game) -> list[int]:
             # A page down, unless the thumb already reaches the track's bottom end (or there is no scrollbar).
             if not (game.pixel_is(*SCROLLBAR_BOTTOM, SCROLLBAR_TRACK_1254)
                     and scroll(game, up=False, notches=PAGE_NOTCHES)):
+                bonus = away and take_daily_bonus(game)
                 break
             continue
         top, cost = affordable[0]
@@ -208,9 +239,9 @@ def send_minions(game: Game) -> list[int]:
                 event("Minion not sent", reason="no effect", cost=cost)
                 game.save_frame("minion-send-no-effect")
                 game.click(570, 694)  # exit
-                return sent
+                return sent, False
             game.sleep(50)
         event("Minion sent", cost=cost)
         sent.append(cost)
     game.click(570, 694)  # exit
-    return sent
+    return sent, bonus

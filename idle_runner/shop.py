@@ -37,6 +37,7 @@ QUESTS_ICON = (1000, 690)
 # Daily Quests until the next reset, then disappears. Solid 379D37 at x = 1188, 32 px tall (466-497 under
 # Phantom Fall's event quests); the header around it is 2A1203, claim buttons are 11A622.
 EXTRA_DAILIES_GREEN = 0x379D37
+EXTRA_DAILIES_HOVER = 0x266E26  # under the pointer: at once after the click, before it goes (live 2026-10-28)
 EXTRA_DAILIES_X = 1188
 WHEEL_PX = 50  # one wheel notch scrolls a shop list by 50 px
 # The ascension panel since the Ultra Ascension node was bought (measured 2026-10-23, client x): Ascend
@@ -438,7 +439,7 @@ class Shop:
         event("Extra daily quests taken")
         g.click(x, y)
         settle = g.now() + 2000
-        while g.pixel_search(x, y, x, y, EXTRA_DAILIES_GREEN, variation=6):
+        while any(g.pixel_search(x, y, x, y, c, variation=6) for c in (EXTRA_DAILIES_GREEN, EXTRA_DAILIES_HOVER)):
             if g.now() > settle:
                 event("Extra daily quests click had no effect")
                 break

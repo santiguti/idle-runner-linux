@@ -5,7 +5,8 @@ import pytest
 
 from idle_runner import minions
 from idle_runner.config import Settings
-from idle_runner.minions import mission_ms, read_available_sp, read_mission_cost, send_buttons, send_minions
+from idle_runner.minions import (daily_bonus_shown, mission_ms, read_available_sp, read_mission_cost, send_buttons,
+                                 send_minions)
 from tests.fakes import OFFSET, read_png
 
 FIXTURES = Path(__file__).parent / "fixtures" / "minions"
@@ -83,7 +84,7 @@ def play_minions_tab(fake, monkeypatch, available: int | None, takes_effect: boo
 def test_sends_every_minion_the_sp_covers(game, fake, monkeypatch, event_names) -> None:
     sent = play_minions_tab(fake, monkeypatch, available=526)
 
-    assert send_minions(game) == [10, 150]  # the costs it sent: they tell when each mission ends
+    assert send_minions(game) == ([10, 150], False)  # the costs it sent: they tell when each mission ends
     assert sent == [10, 150]
     assert event_names().count("Minion sent") == 2
     assert fake.clicks()[-1] == (570, 694)  # closed the panel
@@ -343,3 +344,60 @@ def test_a_lost_minions_tab_click_is_retried(game, fake, monkeypatch, event_name
 
     assert sent == [10, 150]
     assert "Shop click retried" in event_names()
+
+
+@pytest.mark.parametrize(("name", "shown"), [("daily-bonus", True), ("daily-bonus-taken", False), ("away-1676", False),
+                                             ("claim-cut-765038", False)])
+def test_the_daily_bonus_banner_on_recorded_frames(game, fake, name: str, shown: bool) -> None:
+    show_panel(fake, name)
+
+    assert daily_bonus_shown(game) is shown
+
+
+def play_daily_bonus(fake, takes_effect: bool = True) -> None:
+    """The Minions tab with the Daily Bonus banner, Skeleton, White Knight and Goo Mutant on missions (live
+    2026-10-28 21:43). A click on the banner takes 3 hours off them: the banner goes and three claims show."""
+    def act(action: tuple) -> None:
+        if action[0] != "click":
+            return
+        click = (action[1] + OFFSET[0], action[2] + OFFSET[1])
+        if click == (95, 90):
+            fake.paint(538, 681, 0xAD1111)
+            fake.paint(260, 480, 0x58188D)
+        elif click == (332, 680):
+            show_panel(fake, "daily-bonus")
+        elif click == (328, 191) and takes_effect:
+            show_panel(fake, "daily-bonus-taken")
+
+    fake.on_action = act
+
+
+def test_takes_the_daily_bonus_after_sending_while_minions_are_away(game, fake, event_names) -> None:
+    play_daily_bonus(fake)
+
+    assert send_minions(game) == ([], True)
+    assert fake.clicks()[-2:] == [(328, 191), (570, 694)]  # the banner, then the panel's X
+    assert "Minions daily bonus taken" in event_names()
+
+
+def test_a_daily_bonus_click_without_effect_is_reported(game, fake, event_names) -> None:
+    play_daily_bonus(fake, takes_effect=False)
+
+    assert send_minions(game) == ([], False)
+    assert fake.clicks().count((328, 191)) == 1
+    assert "Minions daily bonus click had no effect" in event_names()
+
+
+def test_the_daily_bonus_waits_while_no_minion_is_away(game, fake, monkeypatch) -> None:
+    # It only shortens missions that are running: with every minion home it would be wasted for the day.
+    play_minions_tab(fake, monkeypatch, available=0)
+    send_panel = fake.on_action
+
+    def with_banner(action: tuple) -> None:
+        send_panel(action)
+        if action == ("click", 332 - 8, 680 - 31):
+            fake.frame[108:211, :640] = read_png(FIXTURES / "daily-bonus.png")[108:211]
+
+    fake.on_action = with_banner
+    assert send_minions(game) == ([], False)
+    assert (328, 191) not in fake.clicks()

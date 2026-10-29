@@ -14,7 +14,7 @@ from idle_runner.game import Game
 from idle_runner.game_settings import check_game_settings
 from idle_runner.log import event, log
 from idle_runner.minigames.chest_hunt import chest_hunt
-from idle_runner.minions import mission_ms, send_minions
+from idle_runner.minions import DAILY_BONUS_MS, mission_ms, send_minions
 from idle_runner.minigames.bonus_stage import bonus_stage
 from idle_runner.minigames.boss import boss_fight_knight, boss_fight_victor
 from idle_runner.minigames.ascending_heights import ascending_heights
@@ -233,10 +233,14 @@ class Runner:
                 self.minions_due = False
                 self.timer_minions = g.now()
                 self.minions_back = [t for t in self.minions_back if t > g.now()]
-                for cost in self._routine("send_minions", lambda: send_minions(g)):
+                sent, bonus = self._routine("send_minions", lambda: send_minions(g))
+                for cost in sent:
                     length = mission_ms(cost, s)
                     if length is not None:
                         self.minions_back.append(g.now() + length + MINIONS_MARGIN_MS)
+                if bonus:  # every mission out ends 3 hours sooner: some may be over already
+                    self.minions_back = [t - DAILY_BONUS_MS for t in self.minions_back]
+                    self.minions_due = True
 
     def buy(self) -> None:
         """AutoUpgrade; if a Random Box stopped it or the shop didn't open, buy again in BOX_RETRY_MS

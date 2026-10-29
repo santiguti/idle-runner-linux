@@ -42,6 +42,25 @@ TOOLTIP_BG = (0x26, 0x26, 0x26)
 SP_ICON = (0x6A, 0x31, 0xCA)
 COST_GREEN = (0x11, 0xAA, 0x23)
 COST_RED = (0xAD, 0x11, 0x11)
+LINK = (0xDA, 0x00, 0xAE)  # the links between nodes (2026-10-28)
+TOP_SLACK = 371  # the "top" layout pans 371 px either way from where it was surveyed (2026-10-28)
+
+
+def links(game: Game) -> np.ndarray:
+    """How many link pixels each column of the tree shows (client x 16-619, under the header)."""
+    return (game.grab(24, 136, 627, 650) == LINK).all(axis=2).sum(axis=0)
+
+
+def pan_shift(before: np.ndarray, after: np.ndarray) -> int | None:
+    """How far right the tree moved between two `links` profiles; None if no shift makes them match. At the
+    right shift they matched 0.91-0.96 on six recorded pairs (2026-10-28)."""
+    n, best, best_score = len(before), None, 0.8
+    for shift in range(-450, 451):  # at least 154 columns in common
+        a, b = (before[:n - shift], after[shift:]) if shift >= 0 else (before[-shift:], after[:n + shift])
+        score = np.minimum(a, b).sum() / max(1, np.maximum(a, b).sum())
+        if score > best_score:
+            best, best_score = shift, score
+    return best
 
 
 class Tree:
@@ -55,6 +74,7 @@ class Tree:
             if isinstance(remembered, list) else []
         # Nodes seen locked ("Can't buy yet") since the last purchase: only a purchase unlocks a node.
         self.layout = "min"  # the tree's zoom (Node.layout), set by show_layout
+        self.top_dx: int | None = None  # how far right of its surveyed place the "top" layout is; None: not found
         self.locked: set[str] = set()
 
     def buy(self) -> None:
@@ -72,16 +92,30 @@ class Tree:
             node = NODES[name]
             if node.layout != self.layout:
                 self.show_layout(node.layout)
-            if not self.buy_node(name, node.point):
+            if (point := self.point(name)) is None:
+                event("Tree stopped", node=name, reason="layout not found")
+                self.game.save_frame("tree-layout-not-found")
+                break
+            if not self.buy_node(name, point):
                 break
         update_state(self.state, tree_bought=self.bought)
 
+    def point(self, name: str) -> tuple[int, int] | None:
+        """Where the node is in the layout on screen; None in a "top" layout that wasn't found."""
+        node = NODES[name]
+        if node.layout != "top":
+            return node.point
+        return None if self.top_dx is None else (node.point[0] + self.top_dx, node.point[1])
+
     def still_bought(self, name: str) -> bool:
-        """Open the node's modal and close it again, never pressing Buy: True if it shows bought."""
+        """Open the node's modal and close it again, never pressing Buy: True if it shows bought (or can't be
+        checked: a "top" layout that wasn't found keeps the memory)."""
         node = NODES[name]
         if node.layout != self.layout:
             self.show_layout(node.layout)
-        state = self.open_modal(node.point)
+        if (point := self.point(name)) is None:
+            return True
+        state = self.open_modal(point)
         if state == "buy":
             self.close_modal(758, 582)  # Close
         elif state:
@@ -89,10 +123,10 @@ class Tree:
         return state == "bought"
 
     def show_layout(self, layout: str) -> None:
-        """Zoom the tree to one of its two fixed layouts (Node.layout). "min": all the way out, where every node
+        """Zoom the tree to one of its two layouts (Node.layout). "min": all the way out, where every node
         has a fixed place (2026-10-26). "top": from there 3 notches in at the same spot, then dragged to the top
-        edge: also fixed (best alignment shift (0, 0) over two tries, 2026-10-26), and it shows the rows the
-        header covers at minimum zoom. Dragging doesn't move the tree at minimum zoom."""
+        edge, and it shows the rows the header covers at minimum zoom. Its height is fixed, its sideways place
+        is measured (find_top_layout). Dragging doesn't move the tree at minimum zoom."""
         g = self.game
         g.move(328, 411)  # over the tree
         g.wheel(up=False, notches=20)  # minimum zoom: 10 notches were already enough
@@ -103,7 +137,29 @@ class Tree:
             for _ in range(3):  # inertia is ~30 px: the third drag ends against the top edge
                 g.drag(328, 200, 328, 620)
                 g.sleep(400)
+            self.top_dx = self.find_top_layout()
         self.layout = layout
+
+    def find_top_layout(self) -> int | None:
+        """How far right of its surveyed place the "top" layout is, or None. The zoom keeps the tree's column
+        under the pointer in place, so the layout lands sideways if the game saw the pointer elsewhere: 126 px
+        right once on Windows (2026-10-28), and the click on Ancient Quests hit empty space. Its left edge is a
+        fixed place, 371 px right of the surveyed layout: pan the tree there, drag it back and measure where
+        it came to rest. Inertia took it 14 and 25 px past the drag (live, 2026-10-28): the drag is 20 px short."""
+        g = self.game
+        for _ in range(3):  # 420 px each: the left edge from anywhere
+            g.drag(100, 400, 520, 400)
+            g.sleep(400)
+        edge = self.links_at_rest()
+        g.drag(80 + TOP_SLACK, 400, 100, 400)
+        moved = pan_shift(edge, self.links_at_rest())
+        return None if moved is None else TOP_SLACK + moved
+
+    def links_at_rest(self) -> np.ndarray:
+        """`links` once the tree has stopped and no tooltip covers it (the pointer off the tree)."""
+        self.game.move(900, 400)
+        self.game.sleep(800)
+        return links(self.game)
 
     def open_tree(self) -> bool:
         g = self.game
